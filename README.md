@@ -157,6 +157,9 @@ docker compose up --build
 
 ## 5. 👀 Como visualizar
 
+> 🚀 **Subir tudo de uma vez** (API + MLflow + Dashboard, em janelas separadas):
+> `.\start.ps1` · para encerrar: `.\stop.ps1`
+
 | O quê | Comando (PowerShell) | Abrir em |
 |---|---|---|
 | 🌐 **API + Swagger** (docs interativa) | `adaptive-offers serve` | http://localhost:8000/docs |
@@ -201,6 +204,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/assistant/explain?question=Por que
 | [docs/system-card.md](docs/system-card.md) | 🛡️ System Card (riscos, guardrails) |
 | [docs/lgpd-plan.md](docs/lgpd-plan.md) | 🔒 Plano LGPD |
 | [docs/pitch.md](docs/pitch.md) | 🎤 Roteiro do pitch (Demo Day) |
+| [docs/roadmap-improvements.md](docs/roadmap-improvements.md) | 🧭 Roadmap de evoluções (Typer, DVC, Prefect, EvidentlyAI, deep bandits) |
 | [reports/technical-report.md](reports/technical-report.md) | 📑 Relatório técnico (≤10 páginas) |
 | [reports/algorithmic-strategy.md](reports/algorithmic-strategy.md) | 🎰 Estratégia algorítmica + comparação |
 | [reports/offline-evaluation.md](reports/offline-evaluation.md) | 📏 Avaliação offline + golden set + fairness |

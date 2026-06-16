@@ -2,11 +2,27 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from adaptive_offers.assistant.llm import LLMClient
 from adaptive_offers.assistant.rag import PolicyRAG
 from adaptive_offers.policy.reason_codes import describe
+
+
+def _strip_md(text: str) -> str:
+    """Remove markdown noise so RAG snippets read as plain prose in the UI."""
+    text = re.sub(r"`{1,3}", "", text)
+    text = re.sub(r"^[#>\-\*\s]+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\*\*|\*|_", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _first_sentences(text: str, n: int = 1) -> str:
+    """First ``n`` sentences of a cleaned text (keeps explanations short)."""
+    parts = re.split(r"(?<=[.!?])\s+", _strip_md(text))
+    out = " ".join(p for p in parts[:n] if p).strip()
+    return out or "—"
 
 
 class Assistant:
@@ -23,34 +39,36 @@ class Assistant:
         query = question or f"oferta {arm_name} elegibilidade margem suitability"
         chunks = self.rag.retrieve(query, top_k=top_k)
 
-        reasons = ", ".join(decision.get("reason_codes", []))
-        reason_expl = "; ".join(describe(c) for c in decision.get("reason_codes", []))
-        elig = ", ".join(decision.get("eligible_arms", []))
-        snippet = chunks[0].text if chunks else "(sem política recuperada)"
+        reason_h = "; ".join(describe(c).rstrip(".") for c in decision.get("reason_codes", [])[:4])
+        mode = ("exploração (testando uma alternativa promissora)"
+                if decision.get("explored") else "explotação (melhor estimativa atual)")
+        policy_line = _first_sentences(chunks[0].text, 1) if chunks else "—"
 
-        grounding = (
-            f"Pergunta: {question or 'Por que esta oferta foi escolhida?'}\n"
-            f"Decisão: oferta '{arm_name}' ({decision.get('arm_id')}) pela política "
-            f"{decision.get('policy_name')}@{decision.get('policy_version')}.\n"
-            f"Exploração: {decision.get('explored')}. "
-            f"Score (margem-ponderado): {decision.get('score')}. "
-            f"Valor esperado: {decision.get('expected_reward')}.\n"
-            f"Reason codes: {reasons}.\n"
-            f"Interpretação: {reason_expl}.\n"
-            f"Braços elegíveis: {elig}.\n"
-            f"Política comercial relevante (RAG): {snippet}"
+        # Clean, concise, formatted explanation — no raw markdown dump.
+        clean = (
+            f"A oferta **{arm_name}** foi recomendada pela política "
+            f"`{decision.get('policy_name')}@{decision.get('policy_version')}` "
+            f"em modo de **{mode}**, com valor esperado de "
+            f"**R$ {decision.get('expected_reward')}**.\n\n"
+            f"**Por quê:** {reason_h}.\n\n"
+            f"**Base comercial (RAG):** {policy_line}"
         )
-        prompt = (
-            "Explique, para um público de negócio, a decisão de oferta abaixo, "
-            "usando SOMENTE os fatos fornecidos. Seja conciso e cite a política.\n\n"
-            + grounding
-        )
-        answer = self.llm.complete(prompt, grounding=grounding)
+
+        if self.llm.provider == "offline":
+            answer = clean
+        else:
+            prompt = (
+                "Explique, para um público de negócio, a decisão de oferta abaixo de "
+                "forma concisa (2-3 frases), usando SOMENTE os fatos fornecidos:\n\n" + clean
+            )
+            answer = self.llm.complete(prompt, grounding=clean)
+
         return {
             "answer": answer,
             "provider": self.llm.provider,
             "citations": [
-                {"source": c.source, "score": c.score, "text": c.text} for c in chunks
+                {"source": c.source, "score": c.score, "text": _first_sentences(c.text, 2)}
+                for c in chunks
             ],
         }
 
