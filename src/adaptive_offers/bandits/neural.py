@@ -58,9 +58,13 @@ class NeuralBandit(Policy):
         warmup: int = 64,
     ) -> None:
         if not _TORCH_OK:
+            import sys
+
             raise ImportError(
-                "NeuralBandit requires PyTorch. Install it with "
-                "`pip install \"adaptive-offers[deep]\"` (or `pip install torch`)."
+                "NeuralBandit requires PyTorch, which is not available in this "
+                f"interpreter (Python {sys.version_info.major}.{sys.version_info.minor}). "
+                "PyTorch currently has no wheels for Python 3.14 — use Python 3.11–3.13 "
+                "and install with `pip install \"adaptive-offers[deep]\"` (or `pip install torch`)."
             )
         super().__init__(arms, seed=seed)
         torch.manual_seed(seed)
