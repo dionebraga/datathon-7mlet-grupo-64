@@ -47,14 +47,16 @@ secrets/
 kaggle.json
 .kaggle/
 
-# ---- Data (large / raw artifacts are NOT versioned) ----
-# We version small documented derived layers but never raw downloads or big binaries.
+# ---- Data (large / generated artifacts are NOT versioned) ----
+# We version small documented descriptors (README, schema, golden set) but never
+# raw downloads, generated tables, provenance or big binaries.
 data/kaggle/raw/
 data/**/*.parquet
 data/**/*.zip
 data/**/*.csv
-!data/golden_set/*.jsonl
+data/**/*.json
 !data/**/schema*.json
+!data/golden_set/*.jsonl
 !data/**/*.md
 # Generated artifacts of the run
 artifacts/
