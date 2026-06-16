@@ -1,0 +1,62 @@
+{
+  "description": "Synthetic adaptive-experimentation layer over Bank Marketing.",
+  "separated_from": "data/processed (Kaggle-derived) — physically distinct.",
+  "seed": 42,
+  "reward_horizon_days": 30,
+  "context_features": [
+    "bias",
+    "prev_success",
+    "cellular",
+    "age_norm",
+    "previously_contacted",
+    "low_rates",
+    "young",
+    "senior"
+  ],
+  "tables": {
+    "offer_catalog.parquet": {
+      "grain": "one row per offer (arm)",
+      "columns": {
+        "offer_id": "string PK",
+        "name": "string",
+        "category": "string",
+        "margin": "float — profit if converted (synthetic R$)",
+        "base_logit": "float — baseline conversion log-odds",
+        "context_weights": "json — latent weights over context features",
+        "requires_no_default": "bool eligibility",
+        "requires_no_loan": "bool eligibility",
+        "min_age": "int eligibility",
+        "suitability_tier": "standard|restricted"
+      }
+    },
+    "offer_events.parquet": {
+      "grain": "one row per logged impression",
+      "join_key": "client_event_id -> data/processed",
+      "columns": {
+        "event_id": "string PK",
+        "client_event_id": "FK to processed base",
+        "impression_ts": "ISO date of impression",
+        "offer_id": "FK to catalog",
+        "propensity": "float — logging-policy prob of the shown arm",
+        "n_eligible": "int — eligible arms at decision time",
+        "clicked": "0/1 immediate signal",
+        "converted": "0/1 outcome",
+        "reward": "float — margin if converted else 0",
+        "reward_observed_immediately": "0/1",
+        "reward_is_delayed": "0/1",
+        "reward_delay_days": "int 0..horizon"
+      }
+    },
+    "delayed_rewards.parquet": {
+      "grain": "one row per conversion that matured after a delay",
+      "columns": {
+        "event_id": "FK to offer_events",
+        "client_event_id": "FK to processed",
+        "offer_id": "FK to catalog",
+        "conversion_ts": "ISO date reward matured",
+        "reward_delay_days": "int",
+        "realized_reward": "float"
+      }
+    }
+  }
+}
