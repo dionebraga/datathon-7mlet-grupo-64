@@ -84,9 +84,9 @@ def kpi(col, label: str, value: str, sub: str = "") -> None:
 
 def style_fig(fig: go.Figure, height: int = 360) -> go.Figure:
     fig.update_layout(
-        template="plotly_white", height=height, margin=dict(l=10, r=10, t=30, b=10),
-        font=dict(family="sans-serif", color="#161527"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+        template="plotly_white", height=height, margin={"l": 10, "r": 10, "t": 30, "b": 10},
+        font={"family": "sans-serif", "color": "#161527"},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     )
     return fig
@@ -122,7 +122,7 @@ def load_experiment(horizon: int, seed: int):
 # Sidebar
 # --------------------------------------------------------------------------- #
 with st.sidebar:
-    st.markdown(f"### 🎯 Adaptive Offers")
+    st.markdown("### 🎯 Adaptive Offers")
     st.caption("FIAP 7MLET · Grupo 64")
     horizon = st.select_slider("Horizonte de simulação",
                                options=[2000, 4000, 6000, 8000, 12000, 20000], value=6000)
@@ -183,7 +183,7 @@ with t2:
     for name, res in results.items():
         idx, cum = regret_curve(res, points=80)
         fig.add_trace(go.Scatter(x=idx, y=cum, mode="lines", name=POLICY_LABEL.get(name, name),
-                                 line=dict(width=3, color=POLICY_COLORS.get(name, ACCENT))))
+                                 line={"width": 3, "color": POLICY_COLORS.get(name, ACCENT)}))
     fig.update_layout(title="Regret acumulado ao longo do tempo (menor é melhor)",
                       xaxis_title="Rounds", yaxis_title="Regret acumulado")
     st.plotly_chart(style_fig(fig, height=440), use_container_width=True)
@@ -196,7 +196,7 @@ with t3:
     pulls = pd.Series(results[pick].arm_pulls)
     pulls = pulls[pulls > 0].sort_values(ascending=False)
     fig = go.Figure(go.Pie(labels=pulls.index, values=pulls.values, hole=.55,
-                           marker=dict(colors=px.colors.sequential.Purp[::-1])))
+                           marker={"colors": px.colors.sequential.Purp[::-1]}))
     fig.update_layout(title=f"Mix de ofertas — {POLICY_LABEL.get(pick, pick)}")
     st.plotly_chart(style_fig(fig, height=420), use_container_width=True)
     st.caption("Personalização: políticas contextuais distribuem ofertas conforme o contexto.")
