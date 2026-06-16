@@ -122,6 +122,15 @@ class Settings:
         )
         object.__setattr__(self, "paths", paths)
 
+        # Resolve a relative file tracking URI (e.g. "file:./mlruns") to an
+        # ABSOLUTE path under the project root, so MLflow always logs to the same
+        # place regardless of the current working directory (avoids "no runs"
+        # when training and `mlflow ui` are launched from different folders).
+        uri = self.mlflow_tracking_uri
+        if uri.startswith("file:") and not uri.startswith(("file:/", "file:\\")):
+            rel = uri[len("file:") :].lstrip("./").lstrip(".\\").strip() or "mlruns"
+            object.__setattr__(self, "mlflow_tracking_uri", (root / rel).as_uri())
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

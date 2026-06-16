@@ -38,7 +38,7 @@ Write-Host "  --------------------------------------------------" -ForegroundCol
 Start-Service-Window "Adaptive Offers - API (8000)"       "adaptive-offers serve"
 Write-Host "  [1/3] API REST       -> http://localhost:8000/docs" -ForegroundColor Green
 
-Start-Service-Window "Adaptive Offers - MLflow (5000)"     "`$env:MLFLOW_ALLOW_FILE_STORE='true'; mlflow ui --port 5000"
+Start-Service-Window "Adaptive Offers - MLflow (5000)"     "`$env:MLFLOW_ALLOW_FILE_STORE='true'; mlflow ui --backend-store-uri '$root\mlruns' --port 5000"
 Write-Host "  [2/3] MLflow         -> http://localhost:5000" -ForegroundColor Green
 
 Start-Service-Window "Adaptive Offers - Dashboard (8501)"  "streamlit run dashboard\app.py"
