@@ -7,6 +7,7 @@ configured experiment, satisfying the Datathon's experiment-tracking requirement
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -20,6 +21,10 @@ logger = get_logger("tracking")
 @contextmanager
 def mlflow_run(run_name: str, tags: dict[str, str] | None = None) -> Iterator[Any]:
     """Context manager yielding an MLflow run, or ``None`` if unavailable."""
+    # MLflow 3.x puts the local file store in "maintenance mode" and raises by
+    # default; opt back in so the ``file:./mlruns`` backend keeps working and
+    # `mlflow ui` can read the runs. Set before importing mlflow.
+    os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
     try:
         import mlflow
     except Exception:  # pragma: no cover
