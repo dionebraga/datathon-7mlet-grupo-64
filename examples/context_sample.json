@@ -1,0 +1,12 @@
+{
+  "age": 66,
+  "contact": "cellular",
+  "poutcome": "success",
+  "previously_contacted": 1,
+  "euribor3m": 0.8,
+  "default": "no",
+  "loan": "no",
+  "job": "retired",
+  "marital": "married",
+  "education": "university.degree"
+}

@@ -124,16 +124,24 @@ def offer_catalog() -> list[OfferArm]:
 # Context construction and latent reward model
 # --------------------------------------------------------------------------- #
 def build_context_vector(row: pd.Series | dict, rate_median: float) -> np.ndarray:
-    """Map a processed row to the numeric context vector (CONTEXT_FEATURES)."""
-    get = row.get if isinstance(row, dict) else row.__getitem__
-    age = float(get("age"))
-    euribor = float(get("euribor3m"))
+    """Map a processed row (or a partial context dict) to the context vector.
+
+    Tolerant to missing keys: API/CLI callers may pass partial contexts, so
+    optional fields fall back to neutral defaults (age 40, channel cellular,
+    no prior success, not previously contacted, euribor at the run median).
+    """
+    def g(key, default):
+        val = row.get(key, default) if hasattr(row, "get") else row[key]
+        return default if val is None else val
+
+    age = float(g("age", 40))
+    euribor = float(g("euribor3m", rate_median))
     return np.array([
         1.0,
-        1.0 if str(get("poutcome")).lower() == "success" else 0.0,
-        1.0 if str(get("contact")).lower() == "cellular" else 0.0,
+        1.0 if str(g("poutcome", "nonexistent")).lower() == "success" else 0.0,
+        1.0 if str(g("contact", "cellular")).lower() == "cellular" else 0.0,
         float(np.clip((age - 40.0) / 15.0, -2.0, 3.0)),
-        float(get("previously_contacted")),
+        float(g("previously_contacted", 0)),
         1.0 if euribor < rate_median else 0.0,
         1.0 if age < 30 else 0.0,
         1.0 if age > 60 else 0.0,
