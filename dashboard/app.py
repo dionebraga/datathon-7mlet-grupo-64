@@ -89,7 +89,11 @@ st.markdown(
       .sect {{color:{MUTED};font-size:.78rem;font-weight:700;text-transform:uppercase;
         letter-spacing:.08em;margin:8px 0 2px;}}
       div[data-testid="stPlotlyChart"], div[data-testid="stDataFrame"] {{
-        background:{PANEL}; border:1px solid {GRID}; border-radius:14px; padding:6px;}}
+        background:{PANEL}; border:1px solid {GRID}; border-radius:16px; padding:8px 10px;
+        overflow:hidden; box-shadow:0 6px 22px rgba(0,0,0,.28);}}
+      div[data-testid="stPlotlyChart"] > div, .js-plotly-plot, .plot-container {{
+        overflow:hidden !important;}}
+      div[data-testid="stPlotlyChart"]:hover {{border-color:#2E3650;}}
       .pill {{display:inline-block;padding:4px 11px;border-radius:999px;
         background:rgba(124,108,255,.14);color:#C4BBFF;font-size:.74rem;font-weight:700;margin:2px 5px 2px 0;}}
       .result {{background:linear-gradient(135deg,#171B26,#12141C);border:1px solid {GRID};
@@ -135,9 +139,9 @@ def downsample(arr, points: int = 48):
 
 def tile(col, label: str, value: str, series, color: str) -> None:
     s = downsample(series)
-    fig = go.Figure(go.Scatter(y=s, mode="lines", line={"color": color, "width": 2.4},
-                               fill="tozeroy", fillcolor=hex_rgba(color, 0.10),
-                               hoverinfo="skip"))
+    fig = go.Figure(go.Scatter(
+        y=s, mode="lines", line={"color": color, "width": 2.4, "shape": "spline", "smoothing": 0.7},
+        fill="tozeroy", fillcolor=hex_rgba(color, 0.12), hoverinfo="skip"))
     fig.update_layout(
         height=150, margin={"l": 6, "r": 6, "t": 6, "b": 0},
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -157,33 +161,36 @@ def tile(col, label: str, value: str, series, color: str) -> None:
 def gauge(value: float, title: str, vmax: float, color: str, suffix: str = "") -> go.Figure:
     fig = go.Figure(go.Indicator(
         mode="gauge+number", value=value,
-        number={"suffix": suffix, "font": {"size": 26, "color": TEXT}},
+        number={"suffix": suffix, "font": {"size": 30, "color": TEXT, "family": "Inter"}},
         title={"text": title, "font": {"size": 13, "color": MUTED}},
         gauge={
-            "axis": {"range": [0, vmax], "tickcolor": MUTED, "tickfont": {"color": MUTED, "size": 9}},
-            "bar": {"color": color, "thickness": 0.28},
-            "bgcolor": "rgba(0,0,0,0)", "borderwidth": 0,
+            "axis": {"range": [0, vmax], "tickwidth": 0, "tickcolor": "rgba(0,0,0,0)",
+                     "nticks": 4, "tickfont": {"color": MUTED, "size": 9}},
+            "bar": {"color": color, "thickness": 0.38, "line": {"width": 0}},
+            "bgcolor": "rgba(255,255,255,.03)", "borderwidth": 0,
             "steps": [
-                {"range": [0, vmax * 0.5], "color": "rgba(52,211,153,.12)"},
-                {"range": [vmax * 0.5, vmax * 0.8], "color": "rgba(251,191,36,.12)"},
+                {"range": [0, vmax * 0.5], "color": "rgba(52,211,153,.10)"},
+                {"range": [vmax * 0.5, vmax * 0.8], "color": "rgba(251,191,36,.10)"},
                 {"range": [vmax * 0.8, vmax], "color": "rgba(251,113,133,.12)"},
             ],
         },
     ))
-    fig.update_layout(height=220, margin={"l": 18, "r": 18, "t": 46, "b": 8},
+    fig.update_layout(height=210, margin={"l": 22, "r": 22, "t": 42, "b": 6},
                       paper_bgcolor="rgba(0,0,0,0)", font={"color": TEXT})
     return fig
 
 
 def style_panel(fig: go.Figure, title: str, height: int = 320) -> go.Figure:
     fig.update_layout(
-        template="plotly_dark", height=height, title={"text": title, "font": {"size": 14}},
-        margin={"l": 12, "r": 12, "t": 44, "b": 10}, paper_bgcolor="rgba(0,0,0,0)",
+        template="plotly_dark", height=height,
+        title={"text": title, "font": {"size": 14, "color": TEXT}, "x": 0.01, "xanchor": "left"},
+        margin={"l": 14, "r": 14, "t": 46, "b": 12}, paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)", font={"family": "Inter", "color": TEXT},
-        legend={"orientation": "h", "y": 1.06, "x": 0, "font": {"size": 11}},
+        legend={"orientation": "h", "y": 1.08, "x": 0, "font": {"size": 11}},
+        hoverlabel={"bgcolor": PANEL, "bordercolor": GRID, "font_size": 12},
     )
-    fig.update_xaxes(gridcolor=GRID, zeroline=False)
-    fig.update_yaxes(gridcolor=GRID, zeroline=False)
+    fig.update_xaxes(showgrid=False, zeroline=False, showline=False)
+    fig.update_yaxes(gridcolor="rgba(255,255,255,.05)", zeroline=False, showline=False)
     return fig
 
 
@@ -290,7 +297,8 @@ fig = go.Figure()
 for name, res in results.items():
     idx, cum = regret_curve(res, points=80)
     fig.add_trace(go.Scatter(x=idx, y=cum, mode="lines", name=POLICY_LABEL.get(name, name),
-                             line={"width": 2.6, "color": POLICY_COLORS.get(name, VIOLET)}))
+                             line={"width": 2.8, "color": POLICY_COLORS.get(name, VIOLET),
+                                   "shape": "spline", "smoothing": 0.5}))
 p2.plotly_chart(style_panel(fig, "📉 Regret acumulado (menor é melhor)"), config=NO_BAR, **fill())
 
 pulls = pd.Series(best_res.arm_pulls)
@@ -355,7 +363,8 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
     st.write("")
     cc = st.columns(2)
     cc[0].markdown("**Ofertas elegíveis**")
-    cc[0].write(", ".join(rec.eligible_arms))
+    cc[0].markdown(" ".join(f'<span class="pill">{a}</span>' for a in rec.eligible_arms),
+                   unsafe_allow_html=True)
     cc[1].markdown("**🤖 Assistente (RAG)**")
     cc[1].markdown(exp["answer"])
     with st.expander("📄 Citações de política (RAG)"):

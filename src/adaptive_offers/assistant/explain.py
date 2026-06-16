@@ -11,10 +11,14 @@ from adaptive_offers.policy.reason_codes import describe
 
 
 def _strip_md(text: str) -> str:
-    """Remove markdown noise so RAG snippets read as plain prose in the UI."""
+    """Remove markdown noise so RAG snippets read as plain prose in the UI.
+
+    Keeps underscores intact so offer identifiers (e.g. ``OFF_LOAN_PREAPP``)
+    are not mangled.
+    """
     text = re.sub(r"`{1,3}", "", text)
     text = re.sub(r"^[#>\-\*\s]+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"\*\*|\*|_", "", text)
+    text = re.sub(r"\*\*|\*", "", text)  # bold/italic asterisks only (keep `_`)
     return re.sub(r"\s+", " ", text).strip()
 
 
