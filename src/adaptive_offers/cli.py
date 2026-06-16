@@ -22,6 +22,32 @@ from adaptive_offers.logging_utils import get_logger
 logger = get_logger("cli")
 
 
+def _print_comparison(rows: list[dict]) -> None:
+    """Pretty policy-comparison table via Rich, with a plain-text fallback."""
+    try:
+        from rich.console import Console
+        from rich.table import Table
+
+        table = Table(title="Comparação de políticas", title_style="bold magenta",
+                      header_style="bold")
+        table.add_column("Política", style="cyan", no_wrap=True)
+        table.add_column("Reward", justify="right")
+        table.add_column("Regret ratio", justify="right")
+        table.add_column("Conversão", justify="right")
+        table.add_column("Lift vs baseline", justify="right", style="green")
+        for r in rows:
+            table.add_row(
+                r["policy"], f"{r['cumulative_reward']:,.0f}", f"{r['regret_ratio']:.1%}",
+                f"{r['conversion_rate']:.1%}", f"+{r.get('lift_vs_baseline_pct', 0):.1f}%",
+            )
+        Console().print(table)
+    except Exception:  # pragma: no cover - Rich is optional
+        click.echo("\n=== policy comparison ===")
+        for r in rows:
+            click.echo(f"  {r['policy']:10} reward={r['cumulative_reward']:>10} "
+                       f"regret_ratio={r['regret_ratio']} lift={r.get('lift_vs_baseline_pct', 0)}%")
+
+
 @click.group()
 @click.version_option(package_name="adaptive-offers")
 def cli() -> None:
@@ -94,10 +120,7 @@ def train(policy_name: str, version: str, horizon: int, seed: int | None, compar
         proc = ensure_data(seed=seed)
         bundle = ensure_bundle(proc, seed=seed)
         rows = metrics_matrix(proc, bundle, horizon=horizon)
-        click.echo("\n=== policy comparison ===")
-        for r in rows:
-            click.echo(f"  {r['policy']:10} reward={r['cumulative_reward']:>10} "
-                       f"regret_ratio={r['regret_ratio']} lift={r.get('lift_vs_baseline_pct', 0)}%")
+        _print_comparison(rows)
 
 
 # --------------------------------------------------------------------------- #

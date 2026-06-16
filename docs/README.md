@@ -21,6 +21,7 @@
 | Documento | Descrição |
 |---|---|
 | [♻️ mlops-lifecycle.md](mlops-lifecycle.md) | Ciclo MLOps — MLflow, versionamento/registry de políticas, *approval gate*, canary, **rollback**, monitoramento de **drift** (PSI/KS) e **reward**, plano de retreino. |
+| [🧭 roadmap-improvements.md](roadmap-improvements.md) | Roadmap de evoluções (consultoria sênior): Typer, DVC, Prefect/Dagster, EvidentlyAI, pydantic-settings, Rich, deep/neural bandits e embeddings. |
 
 ## 🛡️ Governança & Conformidade
 
