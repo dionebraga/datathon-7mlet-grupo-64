@@ -20,7 +20,9 @@ def _configure_root(level: str) -> None:
     global _CONFIGURED
     if _CONFIGURED:
         return
-    handler = logging.StreamHandler(sys.stdout)
+    # Logs go to STDERR so command stdout (e.g. the decision JSON) stays clean
+    # and pipeable (`adaptive-offers decide ... | ConvertFrom-Json`).
+    handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)-7s | %(name)s | %(message)s"))
     root = logging.getLogger("adaptive_offers")
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
