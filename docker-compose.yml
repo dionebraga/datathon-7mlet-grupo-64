@@ -1,0 +1,67 @@
+# Full local stack: decision API + MLflow tracking + BI dashboard.
+# Course: Containers (Docker Compose & Docker Network).
+#
+#   docker compose up --build      # start everything
+#   API   -> http://localhost:8000/docs
+#   MLflow-> http://localhost:5000
+#   BI    -> http://localhost:8501
+
+services:
+  api:
+    build: .
+    image: adaptive-offers:local
+    container_name: ao-api
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: prod
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      LOG_LEVEL: INFO
+    volumes:
+      - ao-artifacts:/app/artifacts
+    networks:
+      - ao-net
+    depends_on:
+      - mlflow
+    restart: unless-stopped
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.17.2
+    container_name: ao-mlflow
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - ao-mlflow:/mlflow
+    networks:
+      - ao-net
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    image: adaptive-offers:local
+    container_name: ao-dashboard
+    command: >
+      sh -c "pip install --no-cache-dir streamlit plotly &&
+             streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0"
+    ports:
+      - "8501:8501"
+    environment:
+      AO_API_URL: http://api:8000
+    networks:
+      - ao-net
+    depends_on:
+      - api
+    restart: unless-stopped
+
+# Dedicated bridge network so services resolve each other by name (api, mlflow).
+networks:
+  ao-net:
+    driver: bridge
+
+volumes:
+  ao-artifacts:
+  ao-mlflow:
