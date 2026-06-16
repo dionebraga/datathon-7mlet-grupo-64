@@ -266,66 +266,111 @@ tile(k3, "Conversão", f"{best['conversion_rate']:.1%}", conv_curve, CYAN)
 tile(k4, "Lift vs baseline", f"+{best.get('lift_vs_baseline_pct', 0):.0f}%", lift_curve, GREEN)
 
 # --------------------------------------------------------------------------- #
-# Row 2 — gauges
+# Dense panel grid (New Relic style) — compact builders
 # --------------------------------------------------------------------------- #
-st.markdown('<div class="sect">🎛️ Indicadores da política</div>', unsafe_allow_html=True)
-g1, g2, g3, g4 = st.columns(4)
-g1.plotly_chart(gauge(best["regret_ratio"] * 100, "Regret ratio", 50, RED, "%"), config=NO_BAR, **fill())
-g2.plotly_chart(gauge(best["exploration_rate"] * 100, "Exploração", 30, VIOLET, "%"), config=NO_BAR, **fill())
-g3.plotly_chart(gauge(best["conversion_rate"] * 100, "Conversão", 20, CYAN, "%"), config=NO_BAR, **fill())
-g4.plotly_chart(gauge(best.get("lift_vs_baseline_pct", 0), "Lift vs baseline", 100, GREEN, "%"),
-                config=NO_BAR, **fill())
+GRID_H = 250
+PLABELS = [POLICY_LABEL.get(p, p) for p in sdf["policy"]]
+PCOLORS = [POLICY_COLORS.get(p, VIOLET) for p in sdf["policy"]]
 
-# --------------------------------------------------------------------------- #
-# Row 3 — experiment panels
-# --------------------------------------------------------------------------- #
-st.markdown('<div class="sect">📊 Experimento</div>', unsafe_allow_html=True)
-p1, p2, p3 = st.columns([4, 4, 3])
 
-order = sdf.sort_values("cumulative_reward")
-fig = go.Figure(go.Bar(
-    x=order["cumulative_reward"], y=[POLICY_LABEL.get(p, p) for p in order["policy"]],
-    orientation="h", marker_color=[POLICY_COLORS.get(p, VIOLET) for p in order["policy"]],
-    text=[f"R$ {v:,.0f}" for v in order["cumulative_reward"]], textposition="auto",
-    hovertemplate="%{y}: R$ %{x:,.0f}<extra></extra>"))
-p1.plotly_chart(style_panel(fig, "💰 Valor capturado por política"), config=NO_BAR, **fill())
+def p_hbar(value_col: str, title: str, money: bool = False) -> go.Figure:
+    o = sdf.sort_values(value_col)
+    txt = [f"R$ {v:,.0f}" if money else (f"{v:.1%}" if v < 1 else f"{v:,.1f}") for v in o[value_col]]
+    fig = go.Figure(go.Bar(x=o[value_col], y=[POLICY_LABEL.get(p, p) for p in o["policy"]],
+                           orientation="h", marker_color=[POLICY_COLORS.get(p, VIOLET) for p in o["policy"]],
+                           text=txt, textposition="auto"))
+    return style_panel(fig, title, height=GRID_H)
 
-fig = go.Figure()
-for name, res in results.items():
-    idx, cum = regret_curve(res, points=80)
-    fig.add_trace(go.Scatter(x=idx, y=cum, mode="lines", name=POLICY_LABEL.get(name, name),
-                             line={"width": 2.8, "color": POLICY_COLORS.get(name, VIOLET),
-                                   "shape": "spline", "smoothing": 0.5}))
-p2.plotly_chart(style_panel(fig, "📉 Regret acumulado (menor é melhor)"), config=NO_BAR, **fill())
 
+def p_vbar(x, y, title: str, color: str, pct: bool = True) -> go.Figure:
+    fig = go.Figure(go.Bar(x=list(x), y=list(y), marker_color=color,
+                           text=[f"{v:.1%}" if pct else f"{v:,.0f}" for v in y], textposition="outside"))
+    return style_panel(fig, title, height=GRID_H)
+
+
+def p_donut(labels, values, title: str, colors) -> go.Figure:
+    fig = go.Figure(go.Pie(labels=list(labels), values=list(values), hole=.62,
+                           marker={"colors": colors}, textinfo="percent"))
+    return style_panel(fig, title, height=GRID_H).update_layout(showlegend=False)
+
+
+def p_stat(col, title: str, rows: list[tuple[str, str]]) -> None:
+    items = "".join(
+        f'<div style="display:flex;justify-content:space-between;padding:6px 0;'
+        f'border-bottom:1px solid {GRID}"><span style="color:{MUTED};font-size:.85rem">{lab}</span>'
+        f'<span style="font-weight:700;color:{TEXT}">{val}</span></div>' for lab, val in rows)
+    col.markdown(
+        f'<div style="background:{PANEL};border:1px solid {GRID};border-radius:16px;'
+        f'padding:14px 16px;height:{GRID_H}px;box-shadow:0 6px 22px rgba(0,0,0,.28)">'
+        f'<div style="color:{TEXT};font-weight:700;font-size:14px;margin-bottom:6px">{title}</div>'
+        f'{items}</div>', unsafe_allow_html=True)
+
+
+# pre-computed series
+seg = processed.copy()
+seg["age_band"] = pd.cut(seg["age"], [17, 30, 45, 60, 100], labels=["≤30", "31-45", "46-60", "60+"])
+by_age = seg.groupby("age_band", observed=True)["subscribed"].mean()
+by_pout = target_rate_by(processed, "poutcome")["subscription_rate"]
+by_contact = target_rate_by(processed, "contact")["subscription_rate"]
 pulls = pd.Series(best_res.arm_pulls)
 pulls = pulls[pulls > 0].sort_values(ascending=False)
-fig = go.Figure(go.Pie(labels=pulls.index, values=pulls.values, hole=.62,
-                       marker={"colors": px.colors.sequential.Purp[::-1]}, textinfo="percent"))
-p3.plotly_chart(style_panel(fig, "🎯 Mix de ofertas", height=320).update_layout(showlegend=False),
+regret_fig = go.Figure()
+for name, res in results.items():
+    idx, cum = regret_curve(res, points=70)
+    regret_fig.add_trace(go.Scatter(x=idx, y=cum, mode="lines", name=POLICY_LABEL.get(name, name),
+                                    line={"width": 2.4, "color": POLICY_COLORS.get(name, VIOLET),
+                                          "shape": "spline", "smoothing": 0.5}))
+
+# --- Grid row A: gauges ---------------------------------------------------- #
+st.markdown('<div class="sect">🎛️ Indicadores</div>', unsafe_allow_html=True)
+a1, a2, a3, a4 = st.columns(4)
+a1.plotly_chart(gauge(best["regret_ratio"] * 100, "Regret ratio", 50, RED, "%"), config=NO_BAR, **fill())
+a2.plotly_chart(gauge(best["exploration_rate"] * 100, "Exploração", 30, VIOLET, "%"), config=NO_BAR, **fill())
+a3.plotly_chart(gauge(best["conversion_rate"] * 100, "Conversão", 20, CYAN, "%"), config=NO_BAR, **fill())
+a4.plotly_chart(gauge(best.get("lift_vs_baseline_pct", 0), "Lift vs baseline", 100, GREEN, "%"),
                 config=NO_BAR, **fill())
 
-# --------------------------------------------------------------------------- #
-# Row 4 — quality + live decision feed
-# --------------------------------------------------------------------------- #
-st.markdown('<div class="sect">🧭 Dados & operação</div>', unsafe_allow_html=True)
-q1, q2 = st.columns([5, 4])
-by_p = target_rate_by(processed, "poutcome").reset_index()
-fig = go.Figure(go.Bar(x=by_p["poutcome"], y=by_p["subscription_rate"], marker_color=CYAN,
-                       text=[f"{v:.1%}" for v in by_p["subscription_rate"]], textposition="outside"))
-q1.plotly_chart(style_panel(fig, "Conversão por resultado anterior (poutcome)", height=300),
+# --- Grid row B: experiment ------------------------------------------------ #
+st.markdown('<div class="sect">📊 Experimento</div>', unsafe_allow_html=True)
+b1, b2, b3, b4 = st.columns(4)
+b1.plotly_chart(p_hbar("cumulative_reward", "💰 Valor por política", money=True), config=NO_BAR, **fill())
+b2.plotly_chart(style_panel(regret_fig, "📉 Regret acumulado", height=GRID_H), config=NO_BAR, **fill())
+b3.plotly_chart(p_donut(pulls.index, pulls.values, "🎯 Mix de ofertas", px.colors.sequential.Purp[::-1]),
                 config=NO_BAR, **fill())
-with q2:
-    st.markdown('<div class="sect">📡 Feed de decisões (audit log)</div>', unsafe_allow_html=True)
-    feed = recent_decisions(8)
+b4.plotly_chart(p_hbar("reward_per_1k", "⚡ Reward / 1k", money=True), config=NO_BAR, **fill())
+
+# --- Grid row C: dataset signals ------------------------------------------- #
+st.markdown('<div class="sect">🧬 Sinais da base</div>', unsafe_allow_html=True)
+c1, c2, c3, c4 = st.columns(4)
+c1.plotly_chart(p_vbar(by_pout.index, by_pout.values, "Conversão · poutcome", CYAN), config=NO_BAR, **fill())
+c2.plotly_chart(p_vbar(by_contact.index, by_contact.values, "Conversão · canal", GREEN), config=NO_BAR, **fill())
+c3.plotly_chart(p_vbar(by_age.index.astype(str), by_age.values, "Conversão · faixa etária", AMBER),
+                config=NO_BAR, **fill())
+c4.plotly_chart(p_donut([POLICY_LABEL.get(p, p) for p in sdf["policy"]], sdf["conversion_rate"],
+                        "Conversão por política", PCOLORS), config=NO_BAR, **fill())
+
+# --- Grid row D: comparison + ops ------------------------------------------ #
+st.markdown('<div class="sect">🧭 Comparação & operação</div>', unsafe_allow_html=True)
+d1, d2, d3, d4 = st.columns(4)
+d1.plotly_chart(p_hbar("exploration_rate", "🔍 Exploração por política"), config=NO_BAR, **fill())
+d2.plotly_chart(p_hbar("regret_ratio", "🎯 Regret ratio por política"), config=NO_BAR, **fill())
+p_stat(d3, "📦 Base factual", [
+    ("Registros", f"{qrep['n_rows']:,}"),
+    ("Conversão", f"{qrep['target']['positive_rate']:.1%}"),
+    ("Desbalanceamento", f"{qrep['target']['imbalance_ratio']:.0f}:1"),
+    ("Duplicatas", str(qrep["n_duplicates"])),
+    ("Ofertas (braços)", str(len(bundle.catalog))),
+])
+with d4:
+    st.markdown('<div class="sect" style="margin-top:0">📡 Feed de decisões</div>', unsafe_allow_html=True)
+    feed = recent_decisions(6)
     if feed.empty:
-        st.caption("Nenhuma decisão registrada ainda. Use o explorador abaixo ou a API "
-                   "(`adaptive-offers serve`) para gerar decisões auditáveis.")
+        st.caption("Sem decisões ainda — use o explorador abaixo.")
     else:
-        st.dataframe(feed, hide_index=True, **fill())
+        st.dataframe(feed, hide_index=True, height=GRID_H - 40, **fill())
 
 # --------------------------------------------------------------------------- #
-# Row 5 — decision explorer
+# Decision explorer
 # --------------------------------------------------------------------------- #
 st.markdown('<div class="sect">🧪 Explorador de decisão</div>', unsafe_allow_html=True)
 col = st.columns(3)
