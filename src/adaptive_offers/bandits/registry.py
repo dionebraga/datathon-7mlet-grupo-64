@@ -8,7 +8,11 @@ from adaptive_offers.bandits.linucb import LinUCB
 from adaptive_offers.bandits.thompson import ThompsonSampling
 from adaptive_offers.bandits.ucb import NilosUCB
 
+# Default, dependency-free policies (used by CI and the standard comparison).
 POLICIES: tuple[str, ...] = ("baseline", "thompson", "nilos_ucb", "linucb")
+# Optional policies needing extra deps (PyTorch). Opt-in via build_policy("neural").
+OPTIONAL_POLICIES: tuple[str, ...] = ("neural",)
+ALL_POLICIES: tuple[str, ...] = POLICIES + OPTIONAL_POLICIES
 
 
 def build_policy(
@@ -28,4 +32,8 @@ def build_policy(
         return NilosUCB(arms, seed=seed, **kwargs)
     if name == "linucb":
         return LinUCB(arms, dim=context_dim, seed=seed, **kwargs)
-    raise ValueError(f"unknown policy '{name}'. Choose from {POLICIES}")
+    if name == "neural":
+        from adaptive_offers.bandits.neural import NeuralBandit  # lazy: needs torch
+
+        return NeuralBandit(arms, dim=context_dim, seed=seed, **kwargs)
+    raise ValueError(f"unknown policy '{name}'. Choose from {ALL_POLICIES}")

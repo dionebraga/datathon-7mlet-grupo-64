@@ -12,6 +12,8 @@ REASON_CODES: dict[str, str] = {
     "THOMPSON_SAMPLE": "Braço escolhido por amostragem do posterior (Thompson).",
     "NILOS_UCB": "Braço escolhido por limite superior de confiança variance-aware.",
     "LINUCB": "Braço escolhido por modelo linear contextual (LinUCB).",
+    "NEURAL": "Braço escolhido por bandit neural contextual (MLP em PyTorch).",
+    "MC_DROPOUT": "Exploração bayesiana aproximada via MC-dropout (Thompson neural).",
     "CONTEXTUAL": "Decisão usou o vetor de contexto do cliente.",
     # exploration/exploitation
     "EXPLORATION": "Decisão exploratória (não é o líder atual de média).",

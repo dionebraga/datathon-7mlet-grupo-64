@@ -59,6 +59,22 @@ Modelo linear ridge por braço sobre o vetor de contexto (8 dims):
 `ucb = θ_aᵀx + α·sqrt(xᵀA_a⁻¹x)`. Como cada oferta tem **segmento preferido**
 distinto (Stage 2), o LinUCB roteia a oferta certa para o contexto certo.
 
+### 2.5 Neural Bandit (PyTorch — 5ª política, opcional)
+
+Bandit contextual **profundo** (`bandits/neural.py`, requer
+`pip install "adaptive-offers[deep]"`): um MLP (PyTorch) prevê
+`P(conversão | contexto, braço)` a partir do contexto concatenado ao *one-hot* do
+braço; treina online de um *replay buffer* (SGD em mini-batch). A **exploração**
+usa **MC-dropout** (Gal & Ghahramani, 2016; Riquelme et al., 2018): um *forward*
+estocástico com dropout ligado equivale a uma amostra de Thompson neural.
+
+**Resultado honesto** (facsimile, seed=123, 6.000 rounds): o neural bate o
+baseline (**+31,2%**, regret 0,249) mas fica **atrás do LinUCB** (+59,9%). Isso é
+esperado e didático: redes neurais são mais flexíveis (capturam não-linearidades)
+porém **data-hungry** — em horizontes curtos o LinUCB linear é mais eficiente em
+amostra. Com mais dados/treino o neural tende a fechar o *gap*. Justifica o uso de
+**PyTorch** e abre caminho para *deep bandits* (trabalhos futuros).
+
 ## 3. Cold-start e recompensas atrasadas
 
 - **Cold-start**: TS parte do prior; Nilos-UCB força uma puxada por braço; LinUCB

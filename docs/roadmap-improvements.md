@@ -119,7 +119,7 @@ documentação do schema de configuração "de graça".
 
 | Extensão | Ideia | Ganho esperado |
 |---|---|---|
-| **Deep/Neural bandit** | rede rasa prevê reward por braço (PyTorch) | Captura não-linearidades do contexto |
+| **Deep/Neural bandit** (✅ implementado) | MLP PyTorch + MC-dropout (`bandits/neural.py`) | Captura não-linearidades; +31% vs baseline (data-hungry) |
 | **Embeddings de contexto** | embeddar `job`/`education`/segmento → vetor denso | Generalização entre segmentos |
 | **Embeddings no RAG** | trocar TF-IDF por `sentence-transformers`/Azure | Recuperação semântica melhor |
 | **Doubly Robust OPE** | estimador off-policy DR (vs IPS) | Avaliação com menos variância |

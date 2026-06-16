@@ -97,7 +97,7 @@ def synth_generate(seed: int | None) -> None:
 # --------------------------------------------------------------------------- #
 @cli.command("train")
 @click.option("--policy", "policy_name", default="linucb",
-              type=click.Choice(["baseline", "thompson", "nilos_ucb", "linucb"]))
+              type=click.Choice(["baseline", "thompson", "nilos_ucb", "linucb", "neural"]))
 @click.option("--version", default="v1", show_default=True)
 @click.option("--horizon", default=12_000, show_default=True)
 @click.option("--seed", default=None, type=int)

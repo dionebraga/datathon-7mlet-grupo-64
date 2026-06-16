@@ -27,6 +27,7 @@
 ![pandas](https://img.shields.io/badge/pandas-150458?style=for-the-badge&logo=pandas&logoColor=white)
 ![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white)
 
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
 ![Pydantic](https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
@@ -72,7 +73,7 @@ políticas comerciais internas (sintéticas) e explica cada decisão.
 | Decisão | Escolha | Por quê |
 |---|---|---|
 | 🧠 Formulação | Multi-armed bandit contextual | Equilibra exploração/explotação sem A/B longos |
-| 🎰 Algoritmos | Baseline · Thompson Sampling · Nilos-UCB · LinUCB | Cobre não-contextual (TS/UCB) e contextual (LinUCB) |
+| 🎰 Algoritmos | Baseline · Thompson · Nilos-UCB · LinUCB · **Neural (PyTorch)** | Não-contextual (TS/UCB), contextual linear (LinUCB) e **deep bandit** (MC-dropout) |
 | 📊 Base factual | [Bank Marketing (Kaggle)](data/kaggle/README.md) | Propensão/conversão bancária, licença aberta |
 | 🚫 Vazamento | `duration` e colunas pós-contato **descartadas** | Evitar *target leakage* (Stage 1) |
 | ⏳ Recompensa atrasada | Modelada no enriquecimento sintético | Realismo de canais digitais |
