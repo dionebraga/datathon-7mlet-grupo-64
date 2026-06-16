@@ -52,3 +52,21 @@ def test_reward_monitor_not_ready_with_few_points():
     mon = RewardMonitor(reference_mean=10.0, reference_std=5.0, window=500)
     mon.observe(10.0)
     assert mon.status()["ready"] is False
+
+
+def test_inject_drift_shifts_rates_down(small_layer):
+    from adaptive_offers.monitoring import inject_drift
+
+    processed, _ = small_layer
+    current = inject_drift(processed, seed=7)
+    assert current["euribor3m"].mean() < processed["euribor3m"].mean()
+
+
+def test_drift_report_builds_nonempty_html(small_layer, tmp_path):
+    from adaptive_offers.monitoring import build_report
+
+    out = build_report(out_path=tmp_path / "report.html",
+                       fairness={"max_exposure_disparity": 0.0, "fairness_flag": "ok"}, seed=7)
+    assert out.exists()
+    html = out.read_text(encoding="utf-8")
+    assert "PSI" in html and "plotly" in html.lower() and len(html) > 1000

@@ -11,7 +11,7 @@
 <br/>
 
 [![CI](https://github.com/dionebraga/datathon-7mlet-grupo-64/actions/workflows/ci.yml/badge.svg)](https://github.com/dionebraga/datathon-7mlet-grupo-64/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-55%20passed-brightgreen?style=flat&logo=pytest&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/tests-57%20passed-brightgreen?style=flat&logo=pytest&logoColor=white)](tests/)
 [![Ruff](https://img.shields.io/badge/lint-ruff%20clean-success?style=flat&logo=ruff&logoColor=white)](https://docs.astral.sh/ruff/)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.8.0-blue?style=flat)](pyproject.toml)
@@ -101,7 +101,7 @@ datathon-7mlet-grupo-64/
 │   ├── data/ · feature_store/ · bandits/ · simulation/ · evaluation/
 │   ├── policy/ · assistant/ · monitoring/ · api/ · cli.py
 ├── 📊 dashboard/                  # BI (Streamlit)
-└── ✅ tests/                      # unit/ + integration/ (55 testes)
+└── ✅ tests/                      # unit/ + integration/ (57 testes)
 ```
 
 ## 4. 🚀 Como rodar no Windows / PowerShell
@@ -190,8 +190,9 @@ Invoke-RestMethod -Uri "http://localhost:8000/assistant/explain?question=Por que
 | `adaptive-offers evaluate` | 4 | Métricas reproduzíveis, golden set, fairness de exposição |
 | `adaptive-offers decide` | 5 | Decisão com braço, reason codes, versão da política, log auditável |
 | `adaptive-offers serve` | 5 | API com contrato documentado e tratamento de erro |
+| `adaptive-offers monitor` | 7 | Relatório HTML de drift/fairness (EvidentlyAI opcional) |
 | `adaptive-offers pipeline` | 1–4 | **Tudo em um comando** |
-| `pytest` | — | 55 testes (unit + integração) |
+| `pytest` | — | 57 testes (unit + integração) |
 
 ## 7. 📚 Documentação
 
@@ -246,7 +247,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/assistant/explain?question=Por que
 | 🥉 Nilos-UCB (UCB-V) | 383.010 | 14,1% | +50,2% | — |
 | Baseline (controle) | 255.060 | 42,7% | — | 54% |
 
-- ✅ **55 testes** passando · **ruff** limpo · pipeline ponta-a-ponta em **1 comando**.
+- ✅ **57 testes** passando · **ruff** limpo · pipeline ponta-a-ponta em **1 comando**.
 - 🔍 **IPS off-policy** concorda com a simulação on-policy (~21/impressão).
 - ⚖️ **Fairness** de exposição: disparidade **0,00** entre segmentos.
 

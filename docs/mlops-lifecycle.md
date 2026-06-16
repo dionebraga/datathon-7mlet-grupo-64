@@ -64,6 +64,11 @@ O *gate* é **humano no loop**: a automação calcula evidências; uma pessoa ap
   pelo *score* da política. PSI ≥ 0,25 → `retrain_recommended`.
 - **Reward/conversão** (`monitoring/reward_monitor.py`): *control chart* (z-score
   em janela móvel). Queda sustentada (z < −3) → `rollback/review`.
+- **Relatório HTML** (`monitoring/report.py`): `adaptive-offers monitor` gera
+  `artifacts/monitoring/drift_report.html` (tabela PSI/KS + distribuições Plotly +
+  saúde da recompensa + fairness). Integra **EvidentlyAI** se instalado
+  (`pip install "adaptive-offers[monitoring]"`); senão produz um relatório
+  autossuficiente — sempre funciona, sem dependência dura em CI.
 - Telemetria em Application Insights; alertas disparam o *gate* de retreino.
 
 ## 7. Plano de retreino

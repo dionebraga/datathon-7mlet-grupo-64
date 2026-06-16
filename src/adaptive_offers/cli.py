@@ -159,9 +159,16 @@ def evaluate(horizon: int, seed: int | None) -> None:
     out = settings.paths.artifacts / "evaluation_report.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    from adaptive_offers.monitoring import build_report
+    drift_path = build_report(fairness={
+        "max_exposure_disparity": fairness["max_exposure_disparity"],
+        "fairness_flag": fairness["fairness_flag"]})
+
     click.echo(f"[ok] golden pass_rate={golden['pass_rate']} | "
                f"best={matrix[0]['policy']} | fairness={fairness['fairness_flag']}")
     click.echo(f"[ok] report -> {out}")
+    click.echo(f"[ok] drift/fairness HTML -> {drift_path}")
 
 
 # --------------------------------------------------------------------------- #
@@ -208,6 +215,16 @@ def decide(context_file: Path | None, client_event_id: str | None, explain: bool
         result = Assistant().explain_decision(record.to_dict())
         click.echo("\n=== assistant ===")
         click.echo(result["answer"])
+
+
+@cli.command("monitor")
+@click.option("--seed", default=7, type=int, help="Seed for the simulated drift period.")
+def monitor(seed: int) -> None:
+    """Build the drift & fairness HTML report (Stage 7 observability)."""
+    from adaptive_offers.monitoring import build_report
+
+    path = build_report(seed=seed)
+    click.echo(f"[ok] drift/fairness report -> {path}")
 
 
 @cli.command("serve")

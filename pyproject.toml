@@ -36,6 +36,9 @@ dependencies = [
 llm = ["anthropic>=0.39"]
 # Business-intelligence dashboard.
 bi = ["streamlit>=1.30", "plotly>=5.18"]
+# Drift / fairness monitoring reports (EvidentlyAI). Optional — the platform
+# ships a self-contained HTML report that works without it.
+monitoring = ["evidently>=0.4"]
 # Developer tooling.
 dev = [
     "pytest>=8.0",
