@@ -86,8 +86,9 @@ st.markdown(
         font-weight:700;margin-left:6px;border:1px solid {GRID};}}
       .on {{color:{GREEN};background:rgba(52,211,153,.10);}}
       .off {{color:#64748B;background:rgba(100,116,139,.10);}}
-      .sect {{color:{MUTED};font-size:.78rem;font-weight:700;text-transform:uppercase;
-        letter-spacing:.08em;margin:8px 0 2px;}}
+      .sect {{color:{MUTED};font-size:.82rem;font-weight:700;text-transform:uppercase;
+        letter-spacing:.08em;margin:26px 0 10px;border-left:3px solid {VIOLET};padding-left:10px;}}
+      div[data-testid="column"] {{padding:0 5px;}}
       div[data-testid="stPlotlyChart"], div[data-testid="stDataFrame"] {{
         background:{PANEL}; border:1px solid {GRID}; border-radius:16px; padding:8px 10px;
         overflow:hidden; box-shadow:0 6px 22px rgba(0,0,0,.28);}}
@@ -143,16 +144,16 @@ def tile(col, label: str, value: str, series, color: str) -> None:
         y=s, mode="lines", line={"color": color, "width": 2.4, "shape": "spline", "smoothing": 0.7},
         fill="tozeroy", fillcolor=hex_rgba(color, 0.12), hoverinfo="skip"))
     fig.update_layout(
-        height=150, margin={"l": 6, "r": 6, "t": 6, "b": 0},
+        height=172, margin={"l": 10, "r": 10, "t": 10, "b": 0},
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis={"visible": False}, yaxis={"visible": False},
         annotations=[
-            {"text": label.upper(), "x": 0.02, "y": 1.22, "xref": "paper", "yref": "paper",
+            {"text": label.upper(), "x": 0.02, "y": 1.20, "xref": "paper", "yref": "paper",
              "showarrow": False, "xanchor": "left",
-             "font": {"size": 11, "color": MUTED, "family": "Inter"}},
-            {"text": value, "x": 0.02, "y": 0.62, "xref": "paper", "yref": "paper",
+             "font": {"size": 12, "color": MUTED, "family": "Inter"}},
+            {"text": value, "x": 0.02, "y": 0.60, "xref": "paper", "yref": "paper",
              "showarrow": False, "xanchor": "left",
-             "font": {"size": 33, "color": color, "family": "Inter"}},
+             "font": {"size": 38, "color": color, "family": "Inter"}},
         ],
     )
     col.plotly_chart(fig, config=NO_BAR, **fill())
@@ -161,26 +162,22 @@ def tile(col, label: str, value: str, series, color: str) -> None:
 def gauge(value: float, title: str, vmax: float, color: str, suffix: str = "") -> go.Figure:
     fig = go.Figure(go.Indicator(
         mode="gauge+number", value=value,
-        number={"suffix": suffix, "font": {"size": 30, "color": TEXT, "family": "Inter"}},
+        number={"suffix": suffix, "font": {"size": 36, "color": TEXT, "family": "Inter"}},
         title={"text": title, "font": {"size": 13, "color": MUTED}},
         gauge={
             "axis": {"range": [0, vmax], "tickwidth": 0, "tickcolor": "rgba(0,0,0,0)",
                      "nticks": 4, "tickfont": {"color": MUTED, "size": 9}},
-            "bar": {"color": color, "thickness": 0.38, "line": {"width": 0}},
-            "bgcolor": "rgba(255,255,255,.03)", "borderwidth": 0,
-            "steps": [
-                {"range": [0, vmax * 0.5], "color": "rgba(52,211,153,.10)"},
-                {"range": [vmax * 0.5, vmax * 0.8], "color": "rgba(251,191,36,.10)"},
-                {"range": [vmax * 0.8, vmax], "color": "rgba(251,113,133,.12)"},
-            ],
+            "bar": {"color": color, "thickness": 0.30, "line": {"width": 0}},
+            "bgcolor": "rgba(255,255,255,.05)", "borderwidth": 0,
+            "threshold": {"line": {"color": "#FFFFFF", "width": 2}, "thickness": 0.8, "value": value},
         },
     ))
-    fig.update_layout(height=210, margin={"l": 22, "r": 22, "t": 42, "b": 6},
+    fig.update_layout(height=236, margin={"l": 26, "r": 26, "t": 46, "b": 10},
                       paper_bgcolor="rgba(0,0,0,0)", font={"color": TEXT})
     return fig
 
 
-def style_panel(fig: go.Figure, title: str, height: int = 320) -> go.Figure:
+def style_panel(fig: go.Figure, title: str, height: int = 360) -> go.Figure:
     fig.update_layout(
         template="plotly_dark", height=height,
         title={"text": title, "font": {"size": 14, "color": TEXT}, "x": 0.01, "xanchor": "left"},
