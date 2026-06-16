@@ -62,7 +62,7 @@ class Paths:
     artifacts: Path
 
     @staticmethod
-    def build(root: Path, data_dirname: str, artifacts_dirname: str) -> "Paths":
+    def build(root: Path, data_dirname: str, artifacts_dirname: str) -> Paths:
         data = root / data_dirname
         return Paths(
             root=root,
@@ -75,7 +75,7 @@ class Paths:
             artifacts=root / artifacts_dirname,
         )
 
-    def ensure(self) -> "Paths":
+    def ensure(self) -> Paths:
         """Create writable directories that are not version-controlled."""
         for p in (self.processed, self.synthetic, self.artifacts):
             p.mkdir(parents=True, exist_ok=True)

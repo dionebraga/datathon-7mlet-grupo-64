@@ -7,8 +7,9 @@ configured experiment, satisfying the Datathon's experiment-tracking requirement
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from adaptive_offers.config import get_settings
 from adaptive_offers.logging_utils import get_logger

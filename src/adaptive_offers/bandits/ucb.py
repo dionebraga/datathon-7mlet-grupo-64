@@ -39,9 +39,9 @@ class NilosUCB(Policy):
         super().__init__(arms, seed=seed)
         self.c = exploration_c
         self.variant = variant
-        self.counts = {a: 0 for a in self.arm_ids}
-        self.mean = {a: 0.0 for a in self.arm_ids}
-        self._m2 = {a: 0.0 for a in self.arm_ids}  # Welford sum of squares
+        self.counts = dict.fromkeys(self.arm_ids, 0)
+        self.mean = dict.fromkeys(self.arm_ids, 0.0)
+        self._m2 = dict.fromkeys(self.arm_ids, 0.0)  # Welford sum of squares
 
     def variance(self, arm_id: str) -> float:
         n = self.counts[arm_id]

@@ -38,7 +38,7 @@ class GoldenCase:
     pass_fail: str
 
     @staticmethod
-    def from_dict(d: dict) -> "GoldenCase":
+    def from_dict(d: dict) -> GoldenCase:
         return GoldenCase(
             case_id=d["case_id"], category=d["category"], description=d["description"],
             context=d["context"], assertion=d["assertion"],

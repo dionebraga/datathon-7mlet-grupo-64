@@ -166,9 +166,7 @@ def is_eligible(arm: OfferArm, row: pd.Series | dict) -> bool:
         return False
     if arm.requires_no_loan and str(get("loan")).lower() == "yes":
         return False
-    if float(get("age")) < arm.min_age:
-        return False
-    return True
+    return float(get("age")) >= arm.min_age
 
 
 def eligible_arms(row: pd.Series | dict, arms: list[OfferArm]) -> list[OfferArm]:

@@ -20,8 +20,8 @@ class BaselineGreedy(Policy):
     def __init__(self, arms: list[Arm], seed: int = 42, optimistic_prior: float = 0.15) -> None:
         super().__init__(arms, seed=seed)
         # Optimistic init: prior mean with a small pseudo-count.
-        self._sum = {a: optimistic_prior for a in self.arm_ids}
-        self._count = {a: 1.0 for a in self.arm_ids}
+        self._sum = dict.fromkeys(self.arm_ids, optimistic_prior)
+        self._count = dict.fromkeys(self.arm_ids, 1.0)
 
     def _mean(self, arm_id: str) -> float:
         return self._sum[arm_id] / self._count[arm_id]

@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pandas as pd
 
+from adaptive_offers.bandits.registry import build_policy
 from adaptive_offers.config import get_settings
 from adaptive_offers.data.preprocessing import build_processed, load_processed
-from adaptive_offers.data.synthetic import SyntheticBundle, generate
-from adaptive_offers.evaluation.offline_eval import train_frozen_policy
+from adaptive_offers.data.synthetic import CONTEXT_FEATURES, SyntheticBundle, generate
 from adaptive_offers.feature_store.store import FeatureStore
 from adaptive_offers.logging_utils import get_logger
 from adaptive_offers.policy.decision_service import DecisionService
@@ -22,11 +22,8 @@ from adaptive_offers.policy.versioning import (
     load_policy,
     save_policy,
 )
-from adaptive_offers.simulation.environment import run_simulation
+from adaptive_offers.simulation.environment import build_arms, run_simulation
 from adaptive_offers.simulation.metrics import summarize
-from adaptive_offers.bandits.registry import build_policy
-from adaptive_offers.simulation.environment import build_arms
-from adaptive_offers.data.synthetic import CONTEXT_FEATURES
 
 logger = get_logger("bootstrap")
 

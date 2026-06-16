@@ -30,8 +30,8 @@ class ThompsonSampling(Policy):
         # Beta(1,1) = uniform prior on conversion. Weakly-informative by design.
         self.prior_alpha = prior_alpha
         self.prior_beta = prior_beta
-        self.alpha = {a: prior_alpha for a in self.arm_ids}
-        self.beta = {a: prior_beta for a in self.arm_ids}
+        self.alpha = dict.fromkeys(self.arm_ids, prior_alpha)
+        self.beta = dict.fromkeys(self.arm_ids, prior_beta)
 
     def posterior_mean(self, arm_id: str) -> float:
         a, b = self.alpha[arm_id], self.beta[arm_id]

@@ -13,8 +13,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 from adaptive_offers.bandits.base import Policy
 from adaptive_offers.config import get_settings
 from adaptive_offers.data.synthetic import (
@@ -78,7 +76,7 @@ class DecisionService:
         self._counter = 0
 
     @classmethod
-    def from_active(cls, version: str | None = None) -> "DecisionService":
+    def from_active(cls, version: str | None = None) -> DecisionService:
         """Build a service from the active (or given) saved policy version."""
         policy, meta = load_policy(version)
         return cls(policy=policy, metadata=meta)

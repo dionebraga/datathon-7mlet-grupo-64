@@ -13,7 +13,6 @@ Run: ``adaptive-offers serve`` or ``uvicorn adaptive_offers.api.main:app``.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
 
 from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse

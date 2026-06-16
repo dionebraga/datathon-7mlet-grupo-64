@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 _CONFIGURED = False
@@ -37,7 +37,7 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
 
 def utc_now_iso() -> str:
     """Timezone-aware UTC timestamp in ISO-8601 (used in audit records)."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def log_event(logger: logging.Logger, event: str, **fields: Any) -> dict[str, Any]:

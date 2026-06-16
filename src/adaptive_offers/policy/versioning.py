@@ -12,7 +12,7 @@ import hashlib
 import json
 import pickle
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +24,7 @@ from adaptive_offers.config import get_settings
 class PolicyMetadata:
     name: str
     version: str
-    trained_on: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    trained_on: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     train_config: dict[str, Any] = field(default_factory=dict)
     metrics: dict[str, Any] = field(default_factory=dict)
     content_hash: str = ""

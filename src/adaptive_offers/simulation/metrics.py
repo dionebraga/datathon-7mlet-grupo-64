@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from adaptive_offers.simulation.environment import SimulationResult
 
 
-def summarize(result: "SimulationResult") -> dict[str, Any]:
+def summarize(result: SimulationResult) -> dict[str, Any]:
     """Compact, JSON-serialisable summary of one policy run."""
     n = result.horizon
     cum_reward = float(result.cumulative_reward[-1])
@@ -41,7 +41,7 @@ def summarize(result: "SimulationResult") -> dict[str, Any]:
     }
 
 
-def compare_results(results: list["SimulationResult"]) -> list[dict[str, Any]]:
+def compare_results(results: list[SimulationResult]) -> list[dict[str, Any]]:
     """Summaries for several policies, sorted by cumulative reward (desc)."""
     rows = [summarize(r) for r in results]
     rows.sort(key=lambda r: r["cumulative_reward"], reverse=True)
@@ -56,7 +56,7 @@ def compare_results(results: list["SimulationResult"]) -> list[dict[str, Any]]:
     return rows
 
 
-def regret_curve(result: "SimulationResult", points: int = 50) -> tuple[np.ndarray, np.ndarray]:
+def regret_curve(result: SimulationResult, points: int = 50) -> tuple[np.ndarray, np.ndarray]:
     """Down-sampled (round, cumulative_regret) curve for plotting."""
     cum = result.cumulative_regret
     idx = np.linspace(0, len(cum) - 1, min(points, len(cum))).astype(int)
