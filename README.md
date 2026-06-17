@@ -102,6 +102,7 @@ datathon-7mlet-grupo-64/
 │   ├── data/ · feature_store/ · bandits/ · simulation/ · evaluation/
 │   ├── policy/ · assistant/ · monitoring/ · api/ · cli.py
 ├── 📊 dashboard/                  # BI (Streamlit)
+├── 🎨 frontend/                   # Console de decisão (Next.js + Tailwind v4 — bônus, consome a API)
 └── ✅ tests/                      # unit/ + integration/ (57 testes)
 ```
 

@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* Design tokens — professional "fintech dark" palette (Tailwind v4 @theme). */
+@theme {
+  --color-bg: #0a0e1a;
+  --color-surface: #121826;
+  --color-surface2: #0e131f;
+  --color-border: #1f2937;
+  --color-primary: #6366f1;
+  --color-primary-soft: #a5b4fc;
+  --color-accent: #2dd4bf;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #fb7185;
+  --color-text: #f1f5f9;
+  --color-muted: #94a3b8;
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --radius-card: 1rem;
+}
+
+@layer base {
+  html,
+  body {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(99, 102, 241, 0.1), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(45, 212, 191, 0.06), transparent 55%),
+      var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .card {
+    background: linear-gradient(135deg, var(--color-surface), var(--color-surface2));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: rgba(99, 102, 241, 0.14);
+    color: var(--color-primary-soft);
+    border: 1px solid rgba(99, 102, 241, 0.22);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f2937;
+  border-radius: 999px;
+}
