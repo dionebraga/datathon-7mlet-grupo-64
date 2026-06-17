@@ -386,6 +386,14 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
     with st.spinner("Decidindo…"):
         from adaptive_offers.assistant import Assistant
         from adaptive_offers.bootstrap import ensure_service
+        from adaptive_offers.data.synthetic import (
+            build_context_vector,
+            eligible_arms,
+            expected_reward,
+            is_eligible,
+            latent_conversion_prob,
+            offer_catalog,
+        )
 
         ctx = {"age": age, "contact": contact, "poutcome": poutcome, "euribor3m": euribor,
                "default": default, "loan": loan, "previously_contacted": prev}
@@ -393,25 +401,82 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
         rec = svc.decide(context=ctx, log=True)
         exp = Assistant().explain_decision(rec.to_dict())
 
+        cat = offer_catalog()
+        by_id = {a.offer_id: a for a in cat}
+        rate_median = float(svc.fs.get_metadata("rate_median", 2.5)) if svc.fs.is_materialized() else 2.5
+        ctxv = build_context_vector(ctx, rate_median)
+        elig_ids = {a.offer_id for a in eligible_arms(ctx, cat)}
+        rows = []
+        for a in cat:
+            p = latent_conversion_prob(a, ctxv)
+            rows.append({"id": a.offer_id, "Oferta": a.name, "p": p, "Margem": a.margin,
+                         "Valor": expected_reward(a, ctxv), "Elegível": a.offer_id in elig_ids,
+                         "Escolhida": a.offer_id == rec.arm_id})
+        bdf = pd.DataFrame(rows).sort_values("Valor", ascending=False)
+        bdf_e = bdf[bdf["Elegível"]]
+
+    # --- headline card -----------------------------------------------------
+    mode_txt = "🔍 Exploração (testa alternativa)" if rec.explored else "🎯 Explotação (melhor estimativa)"
     pills = " ".join(f'<span class="pill">{c}</span>' for c in rec.reason_codes)
     st.markdown(
-        f'<div class="result"><div class="arm">🎁 {rec.arm_name}</div>'
-        f'<div style="color:{MUTED};margin:4px 0 12px">valor esperado '
-        f'<b style="color:{TEXT}">R$ {rec.expected_reward:.1f}</b> · '
-        f'{"🔍 exploração" if rec.explored else "🎯 explotação"} · '
-        f'política <b style="color:{TEXT}">{rec.policy_name}@{rec.policy_version}</b></div>{pills}</div>',
-        unsafe_allow_html=True,
-    )
+        f'<div class="result"><div style="display:flex;justify-content:space-between;align-items:center">'
+        f'<div class="arm">🎁 {rec.arm_name}</div>'
+        f'<div style="text-align:right"><div style="font-size:1.6rem;font-weight:800;color:{GREEN}">'
+        f'R$ {rec.expected_reward:.1f}</div><div style="color:{MUTED};font-size:.78rem">valor esperado</div></div></div>'
+        f'<div style="color:{MUTED};margin:6px 0 12px">{mode_txt} · '
+        f'política <b style="color:{TEXT}">{rec.policy_name}@{rec.policy_version}</b> · '
+        f'{len(elig_ids)} de {len(cat)} ofertas elegíveis</div>{pills}</div>',
+        unsafe_allow_html=True)
     st.write("")
-    cc = st.columns(2)
-    cc[0].markdown("**Ofertas elegíveis**")
-    cc[0].markdown(" ".join(f'<span class="pill">{a}</span>' for a in rec.eligible_arms),
-                   unsafe_allow_html=True)
-    cc[1].markdown("**🤖 Assistente (RAG)**")
-    cc[1].markdown(exp["answer"])
-    with st.expander("📄 Citações de política (RAG)"):
+
+    # --- value breakdown chart + detail table ------------------------------
+    e1, e2 = st.columns([3, 2])
+    colors = [GREEN if c else (VIOLET if el else "#3A3F52")
+              for c, el in zip(bdf_e["Escolhida"], bdf_e["Elegível"], strict=False)]
+    fig = go.Figure(go.Bar(
+        x=bdf_e["Valor"], y=bdf_e["Oferta"], orientation="h", marker_color=colors,
+        text=[f"R$ {v:.1f}{' ✅' if c else ''}" for v, c in zip(bdf_e["Valor"], bdf_e["Escolhida"], strict=False)],
+        textposition="auto", hovertemplate="%{y}: R$ %{x:.1f}<extra></extra>"))
+    e1.plotly_chart(style_panel(fig, "📊 Valor esperado por oferta elegível (margem × P conversão)",
+                                height=300), config=NO_BAR, **fill())
+    with e2:
+        st.markdown("**🧾 Detalhe por oferta**")
+        show = bdf_e[["Oferta", "p", "Margem", "Valor", "Escolhida"]].copy()
+        show["P(conv)"] = (show["p"] * 100).round(1).astype(str) + "%"
+        show["Margem"] = "R$ " + show["Margem"].astype(int).astype(str)
+        show["Valor"] = "R$ " + show["Valor"].round(1).astype(str)
+        show["✓"] = show["Escolhida"].map({True: "✅", False: ""})
+        st.dataframe(show[["Oferta", "P(conv)", "Margem", "Valor", "✓"]], hide_index=True, **fill())
+
+    # --- client profile + chosen offer details -----------------------------
+    f1, f2, f3 = st.columns(3)
+    p_stat(f1, "👤 Perfil do cliente", [
+        ("Idade", str(age)), ("Canal", contact), ("Resultado anterior", poutcome),
+        ("Em default", default), ("Tem empréstimo", loan), ("Euribor 3m", f"{euribor}")])
+    arm = by_id[rec.arm_id]
+    rules = []
+    if arm.requires_no_default:
+        rules.append("sem default")
+    if arm.requires_no_loan:
+        rules.append("sem empréstimo")
+    if arm.min_age:
+        rules.append(f"idade ≥ {arm.min_age}")
+    p_stat(f2, f"🎯 {rec.arm_name}", [
+        ("ID", rec.arm_id), ("Categoria", arm.category), ("Margem", f"R$ {arm.margin:.0f}"),
+        ("Suitability", arm.suitability_tier), ("Regras", ", ".join(rules) or "nenhuma"),
+        ("Elegível agora", "✅" if is_eligible(arm, ctx) else "❌")])
+    with f3:
+        st.markdown("**🧠 Por que esta decisão**")
+        for r in rec.reasons:
+            st.markdown(f"<div style='font-size:.86rem;margin:3px 0'><b style='color:#C4BBFF'>"
+                        f"{r['code']}</b> — {r['description']}</div>", unsafe_allow_html=True)
+
+    # --- assistant (RAG) ---------------------------------------------------
+    st.markdown("##### 🤖 Explicação do assistente (LLM + RAG)")
+    st.markdown(f'<div class="result">{exp["answer"]}</div>', unsafe_allow_html=True)
+    with st.expander("📄 Citações de política comercial (RAG)"):
         for c in exp["citations"]:
-            st.write(f"- `{c['source']}` · relevância {c.get('score', 0)} — {c['text']}")
+            st.markdown(f"- **`{c['source']}`** · relevância {c.get('score', 0)} — {c['text']}")
 
 st.divider()
 st.caption("Grupo 64 · FIAP Pós-Tech 7MLET · github.com/dionebraga/datathon-7mlet-grupo-64")
