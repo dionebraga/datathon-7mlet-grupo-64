@@ -61,12 +61,15 @@ def hex_rgba(hex_color: str, alpha: float) -> str:
 # --------------------------------------------------------------------------- #
 st.set_page_config(page_title="Adaptive Offers · Observability", page_icon="🛰️", layout="wide")
 
-BG = "#0E1117"
-PANEL = "#161A23"
-GRID = "#222838"
-TEXT = "#E6E6F0"
-MUTED = "#9AA0B4"
-VIOLET, CYAN, GREEN, AMBER, RED = "#7C6CFF", "#22D3EE", "#34D399", "#FBBF24", "#FB7185"
+# Professional "fintech dark" palette (one brand colour + neutrals + semantics).
+BG = "#0A0E1A"
+PANEL = "#121826"
+PANEL2 = "#0E131F"
+GRID = "#1F2937"
+TEXT = "#F1F5F9"
+MUTED = "#94A3B8"
+VIOLET, CYAN, GREEN, AMBER, RED = "#6366F1", "#2DD4BF", "#34D399", "#FBBF24", "#FB7185"
+ACCENT_LT = "#A5B4FC"  # indigo-300, for pills / subtle highlights
 POLICY_COLORS = {"linucb": VIOLET, "thompson": GREEN, "nilos_ucb": CYAN, "baseline": "#64748B"}
 POLICY_LABEL = {"linucb": "LinUCB", "thompson": "Thompson", "nilos_ucb": "Nilos-UCB",
                 "baseline": "Baseline"}
@@ -74,33 +77,43 @@ POLICY_LABEL = {"linucb": "LinUCB", "thompson": "Thompson", "nilos_ucb": "Nilos-
 st.markdown(
     f"""
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
       #MainMenu, footer, [data-testid="stToolbar"] {{visibility: hidden;}}
-      .stApp {{background: {BG};}}
-      .block-container {{padding-top: 1rem; padding-bottom: 2rem; max-width: 1360px;}}
+      html, body, [class*="css"], .stApp {{font-family:'Inter',system-ui,sans-serif;}}
+      .stApp {{background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(99,102,241,.08), transparent 60%),
+        radial-gradient(900px 500px at -10% 10%, rgba(45,212,191,.05), transparent 55%), {BG};}}
+      .block-container {{padding-top: 1rem; padding-bottom: 2.5rem; max-width: 1360px;}}
+      [data-testid="stSidebar"] {{background:{PANEL2}; border-right:1px solid {GRID};}}
       .topbar {{display:flex; align-items:center; justify-content:space-between;
-        border:1px solid {GRID}; background:linear-gradient(90deg,#171B26,#12141C);
-        border-radius:14px; padding:14px 20px; margin-bottom:14px;}}
-      .topbar h1 {{margin:0;font-size:1.35rem;font-weight:800;color:{TEXT};letter-spacing:-.01em;}}
-      .topbar .sub {{color:{MUTED};font-size:.82rem;margin-top:2px;}}
-      .stat {{display:inline-block;padding:5px 12px;border-radius:999px;font-size:.76rem;
-        font-weight:700;margin-left:6px;border:1px solid {GRID};}}
-      .on {{color:{GREEN};background:rgba(52,211,153,.10);}}
-      .off {{color:#64748B;background:rgba(100,116,139,.10);}}
-      .sect {{color:{MUTED};font-size:.82rem;font-weight:700;text-transform:uppercase;
-        letter-spacing:.08em;margin:26px 0 10px;border-left:3px solid {VIOLET};padding-left:10px;}}
-      div[data-testid="column"] {{padding:0 5px;}}
+        border:1px solid {GRID}; background:linear-gradient(120deg,{PANEL} 0%,{PANEL2} 100%);
+        border-radius:16px; padding:16px 22px; margin-bottom:16px;
+        box-shadow:0 8px 30px rgba(0,0,0,.35);}}
+      .topbar h1 {{margin:0;font-size:1.32rem;font-weight:800;color:{TEXT};letter-spacing:-.02em;}}
+      .topbar .sub {{color:{MUTED};font-size:.82rem;margin-top:3px;}}
+      .stat {{display:inline-block;padding:5px 12px;border-radius:999px;font-size:.74rem;
+        font-weight:700;margin-left:6px;border:1px solid {GRID};letter-spacing:.02em;}}
+      .on {{color:{GREEN};background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.25);}}
+      .off {{color:#64748B;background:rgba(100,116,139,.08);}}
+      .sect {{color:{MUTED};font-size:.78rem;font-weight:700;text-transform:uppercase;
+        letter-spacing:.10em;margin:28px 0 12px;border-left:3px solid {VIOLET};padding-left:11px;}}
+      div[data-testid="column"] {{padding:0 6px;}}
       div[data-testid="stPlotlyChart"], div[data-testid="stDataFrame"] {{
-        background:{PANEL}; border:1px solid {GRID}; border-radius:16px; padding:8px 10px;
-        overflow:hidden; box-shadow:0 6px 22px rgba(0,0,0,.28);}}
+        background:{PANEL}; border:1px solid {GRID}; border-radius:16px; padding:8px 12px;
+        overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.30); transition:border-color .15s ease;}}
       div[data-testid="stPlotlyChart"] > div, .js-plotly-plot, .plot-container {{
         overflow:hidden !important;}}
-      div[data-testid="stPlotlyChart"]:hover {{border-color:#2E3650;}}
-      .pill {{display:inline-block;padding:4px 11px;border-radius:999px;
-        background:rgba(124,108,255,.14);color:#C4BBFF;font-size:.74rem;font-weight:700;margin:2px 5px 2px 0;}}
-      .result {{background:linear-gradient(135deg,#171B26,#12141C);border:1px solid {GRID};
-        border-radius:16px;padding:20px 24px;}}
-      .result .arm {{font-size:1.5rem;font-weight:800;color:#C4BBFF;}}
+      div[data-testid="stPlotlyChart"]:hover, div[data-testid="stDataFrame"]:hover {{
+        border-color:rgba(99,102,241,.45);}}
+      .pill {{display:inline-block;padding:4px 12px;border-radius:999px;
+        background:rgba(99,102,241,.14);color:{ACCENT_LT};font-size:.73rem;font-weight:700;
+        margin:3px 6px 3px 0;border:1px solid rgba(99,102,241,.22);}}
+      .result {{background:linear-gradient(135deg,{PANEL} 0%,{PANEL2} 100%);border:1px solid {GRID};
+        border-radius:18px;padding:22px 26px;box-shadow:0 12px 34px rgba(0,0,0,.32);}}
+      .result .arm {{font-size:1.55rem;font-weight:800;color:{ACCENT_LT};letter-spacing:-.01em;}}
       .svc {{font-size:.82rem;padding:5px 0;color:{TEXT};}}
+      .stButton > button {{border-radius:12px;font-weight:700;border:1px solid rgba(99,102,241,.4);
+        box-shadow:0 8px 24px rgba(99,102,241,.25);}}
     </style>
     """,
     unsafe_allow_html=True,
