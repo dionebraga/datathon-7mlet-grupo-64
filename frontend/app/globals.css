@@ -38,7 +38,8 @@
     pointer-events: none;
     background:
       radial-gradient(1000px 520px at 80% -10%, rgba(0, 112, 243, 0.1), transparent 60%),
-      url("/hero-bg.png") center / cover no-repeat;
+      url("/hero-bg.png") center / cover no-repeat,
+      url("/hero-bg.svg") center / cover no-repeat;
     opacity: 0.16;
   }
 }

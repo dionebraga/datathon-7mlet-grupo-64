@@ -75,6 +75,28 @@ POLICY_COLORS = {"linucb": VIOLET, "thompson": GREEN, "nilos_ucb": CYAN, "baseli
 POLICY_LABEL = {"linucb": "LinUCB", "thompson": "Thompson", "nilos_ucb": "Nilos-UCB",
                 "baseline": "Baseline"}
 
+
+def _hero_bg_layer() -> str:
+    """CSS background-image layer (base64 data URI) for the hero image.
+
+    Prefers the user's own file in ``frontend/public/`` and falls back to the
+    generated SVG; returns ``""`` (no layer) if none exists. The image is later
+    dimmed by a translucent black overlay so it reads as a subtle backdrop.
+    """
+    import base64
+
+    public = ROOT / "frontend" / "public"
+    for name, mime in (("hero-bg.png", "image/png"), ("hero-bg.jpg", "image/jpeg"),
+                       ("hero-bg.jpeg", "image/jpeg"), ("hero-bg.svg", "image/svg+xml")):
+        f = public / name
+        if f.exists():
+            b64 = base64.b64encode(f.read_bytes()).decode("ascii")
+            return f'url("data:{mime};base64,{b64}") center/cover fixed no-repeat, '
+    return ""
+
+
+HERO_BG = _hero_bg_layer()
+
 st.markdown(
     f"""
     <style>
@@ -83,7 +105,9 @@ st.markdown(
       html, body, [class*="css"], .stApp {{font-family:'Inter',system-ui,sans-serif;}}
       .stApp {{background:
         radial-gradient(1200px 600px at 80% -10%, rgba(0,112,243,.08), transparent 60%),
-        radial-gradient(900px 500px at -10% 10%, rgba(0,112,243,.05), transparent 55%), {BG};}}
+        radial-gradient(900px 500px at -10% 10%, rgba(0,112,243,.05), transparent 55%),
+        linear-gradient(rgba(0,0,0,.82), rgba(0,0,0,.82)),
+        {HERO_BG}{BG};}}
       .block-container {{padding-top: 1rem; padding-bottom: 2.5rem; max-width: 1360px;}}
       [data-testid="stSidebar"] {{background:{PANEL2}; border-right:1px solid {GRID};}}
       .topbar {{display:flex; align-items:center; justify-content:space-between;
