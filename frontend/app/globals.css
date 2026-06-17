@@ -22,13 +22,24 @@
 @layer base {
   html,
   body {
-    background:
-      radial-gradient(1100px 560px at 82% -12%, rgba(0, 112, 243, 0.12), transparent 60%),
-      radial-gradient(800px 460px at -8% 8%, rgba(0, 112, 243, 0.05), transparent 55%),
-      var(--color-bg);
+    background: var(--color-bg);
     color: var(--color-text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Hero background image with slight transparency (drop hero-bg.png in /public).
+     Falls back to a blue glow gradient if the image is absent. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(1000px 520px at 80% -10%, rgba(0, 112, 243, 0.1), transparent 60%),
+      url("/hero-bg.png") center / cover no-repeat;
+    opacity: 0.16;
   }
 }
 
