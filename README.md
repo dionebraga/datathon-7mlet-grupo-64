@@ -256,7 +256,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/assistant/explain?question=Por que
 
 <div align="center">
 
-**Grupo 64 — FIAP Pós-Tech 7MLET** · Licença [MIT](LICENSE)
+**Adaptive Offers Platform** · © 2026 **Dione Braga** — Grupo 64 · FIAP Pós-Tech 7MLET · Licença [MIT](LICENSE)
 
 [⬆ Voltar ao topo](#-adaptive-offers-platform)
 

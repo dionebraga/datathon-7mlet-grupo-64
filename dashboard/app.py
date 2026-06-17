@@ -199,13 +199,13 @@ def recent_decisions(n: int = 8) -> pd.DataFrame:
     rows = [json.loads(ln) for ln in lines]
     if not rows:
         return pd.DataFrame()
-    df = pd.DataFrame(rows)
-    cols = [c for c in ["ts", "arm_name", "expected_reward", "explored", "policy_version"] if c in df]
-    df = df[cols].iloc[::-1]
-    if "ts" in df:
-        df["ts"] = df["ts"].str.slice(11, 19)
-    return df.rename(columns={"ts": "hora", "arm_name": "oferta", "expected_reward": "valor",
-                              "explored": "explorou", "policy_version": "versão"})
+    df = pd.DataFrame(rows).iloc[::-1]
+    return pd.DataFrame({
+        "Hora": df["ts"].str.slice(11, 19) if "ts" in df else "",
+        "Oferta": df.get("arm_name", ""),
+        "Modo": df["explored"].map({True: "🔍 expl.", False: "🎯 explot."}) if "explored" in df else "",
+        "Valor": df["expected_reward"].map(lambda v: f"R$ {float(v):.1f}") if "expected_reward" in df else "",
+    })
 
 
 # --------------------------------------------------------------------------- #
@@ -229,7 +229,14 @@ with st.sidebar:
                 + '<br/><code>adaptive-offers serve</code></div>', unsafe_allow_html=True)
     st.markdown('<div class="svc">MLflow ' + badge(mlf_up)
                 + '<br/><code>mlflow ui</code></div>', unsafe_allow_html=True)
-    st.info("API e MLflow são processos separados. Use `.\\start.ps1` para subir tudo.", icon="ℹ️")
+    st.divider()
+    st.markdown("##### 📌 Como ler o board")
+    st.markdown(
+        f'<div style="font-size:.82rem;color:{MUTED};line-height:1.9">'
+        f'↑ <b style="color:{TEXT}">Reward</b> — valor capturado (margem×conversão)<br/>'
+        f'↓ <b style="color:{TEXT}">Regret</b> — distância do ótimo<br/>'
+        f'<b style="color:{TEXT}">Lift</b> — ganho vs política fixa (baseline)<br/>'
+        '🔍 exploração · 🎯 explotação</div>', unsafe_allow_html=True)
 
 processed, bundle, results = load_experiment(int(horizon), int(seed))
 summary = compare_results(list(results.values()))
@@ -479,4 +486,11 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
             st.markdown(f"- **`{c['source']}`** · relevância {c.get('score', 0)} — {c['text']}")
 
 st.divider()
-st.caption("Grupo 64 · FIAP Pós-Tech 7MLET · github.com/dionebraga/datathon-7mlet-grupo-64")
+st.markdown(
+    f'<div style="text-align:center;color:{MUTED};font-size:.82rem;padding:8px 0 4px">'
+    f'<b style="color:{TEXT}">Adaptive Offers Platform</b> · © 2026 '
+    f'<b style="color:#C4BBFF">Dione Braga</b> — Grupo 64 · FIAP Pós-Tech 7MLET'
+    '<br/><span style="font-size:.76rem">Licença MIT · '
+    '<a href="https://github.com/dionebraga/datathon-7mlet-grupo-64" '
+    'style="color:#9AA0B4;text-decoration:none">github.com/dionebraga/datathon-7mlet-grupo-64</a>'
+    '</span></div>', unsafe_allow_html=True)
