@@ -24,10 +24,10 @@
   body {
     min-height: 100%;
     /* Hero background image (user's /hero-bg.png if present, else generated SVG),
-       fixed and dimmed by a translucent black overlay so content stays readable. */
+       fixed on pure black. A light overlay keeps content readable while letting
+       the neon curve — including its bright white core — show through. */
     background:
-      linear-gradient(rgba(0, 0, 0, 0.52), rgba(0, 0, 0, 0.52)),
-      radial-gradient(1100px 560px at 80% -8%, rgba(0, 112, 243, 0.14), transparent 60%),
+      linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)),
       url("/hero-bg.png") center / cover fixed no-repeat,
       url("/hero-bg.svg") center / cover fixed no-repeat,
       var(--color-bg);

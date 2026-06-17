@@ -104,9 +104,7 @@ st.markdown(
       #MainMenu, footer, [data-testid="stToolbar"] {{visibility: hidden;}}
       html, body, [class*="css"], .stApp {{font-family:'Inter',system-ui,sans-serif;}}
       .stApp {{background:
-        radial-gradient(1200px 600px at 80% -10%, rgba(0,112,243,.08), transparent 60%),
-        radial-gradient(900px 500px at -10% 10%, rgba(0,112,243,.05), transparent 55%),
-        linear-gradient(rgba(0,0,0,.82), rgba(0,0,0,.82)),
+        linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,.6)),
         {HERO_BG}{BG};}}
       .block-container {{padding-top: 1rem; padding-bottom: 2.5rem; max-width: 1360px;}}
       [data-testid="stSidebar"] {{background:{PANEL2}; border-right:1px solid {GRID};}}
