@@ -22,34 +22,29 @@
 @layer base {
   html,
   body {
-    background: var(--color-bg);
+    min-height: 100%;
+    /* Hero background image (user's /hero-bg.png if present, else generated SVG),
+       fixed and dimmed by a translucent black overlay so content stays readable. */
+    background:
+      linear-gradient(rgba(0, 0, 0, 0.52), rgba(0, 0, 0, 0.52)),
+      radial-gradient(1100px 560px at 80% -8%, rgba(0, 112, 243, 0.14), transparent 60%),
+      url("/hero-bg.png") center / cover fixed no-repeat,
+      url("/hero-bg.svg") center / cover fixed no-repeat,
+      var(--color-bg);
     color: var(--color-text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-  }
-
-  /* Hero background image with slight transparency (drop hero-bg.png in /public).
-     Falls back to a blue glow gradient if the image is absent. */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background:
-      radial-gradient(1000px 520px at 80% -10%, rgba(0, 112, 243, 0.1), transparent 60%),
-      url("/hero-bg.png") center / cover no-repeat,
-      url("/hero-bg.svg") center / cover no-repeat;
-    opacity: 0.16;
   }
 }
 
 @layer components {
   .card {
-    background: linear-gradient(180deg, var(--color-surface), #060606);
+    background: linear-gradient(180deg, rgba(13, 13, 15, 0.66), rgba(6, 6, 6, 0.74));
     border: 1px solid var(--color-border);
     border-radius: var(--radius-card);
     box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
   .pill {
     display: inline-flex;
