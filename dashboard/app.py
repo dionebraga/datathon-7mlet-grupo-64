@@ -61,16 +61,17 @@ def hex_rgba(hex_color: str, alpha: float) -> str:
 # --------------------------------------------------------------------------- #
 st.set_page_config(page_title="Adaptive Offers · Observability", page_icon="🛰️", layout="wide")
 
-# Professional "fintech dark" palette (one brand colour + neutrals + semantics).
-BG = "#0A0E1A"
-PANEL = "#121826"
-PANEL2 = "#0E131F"
-GRID = "#1F2937"
-TEXT = "#F1F5F9"
-MUTED = "#94A3B8"
-VIOLET, CYAN, GREEN, AMBER, RED = "#6366F1", "#2DD4BF", "#34D399", "#FBBF24", "#FB7185"
-ACCENT_LT = "#A5B4FC"  # indigo-300, for pills / subtle highlights
-POLICY_COLORS = {"linucb": VIOLET, "thompson": GREEN, "nilos_ucb": CYAN, "baseline": "#64748B"}
+# Vercel-style dark palette (pure black + electric blue + neutrals + semantics).
+BG = "#000000"
+PANEL = "#0A0A0A"
+PANEL2 = "#060606"
+GRID = "#1C1C1F"
+TEXT = "#EDEDED"
+MUTED = "#A1A1AA"
+# VIOLET kept as the variable name but now holds the brand electric blue.
+VIOLET, CYAN, GREEN, AMBER, RED = "#0070F3", "#3291FF", "#34D399", "#F5A623", "#EF4444"
+ACCENT_LT = "#3291FF"  # light electric blue, for pills / subtle highlights
+POLICY_COLORS = {"linucb": VIOLET, "thompson": GREEN, "nilos_ucb": CYAN, "baseline": "#52525B"}
 POLICY_LABEL = {"linucb": "LinUCB", "thompson": "Thompson", "nilos_ucb": "Nilos-UCB",
                 "baseline": "Baseline"}
 
@@ -81,8 +82,8 @@ st.markdown(
       #MainMenu, footer, [data-testid="stToolbar"] {{visibility: hidden;}}
       html, body, [class*="css"], .stApp {{font-family:'Inter',system-ui,sans-serif;}}
       .stApp {{background:
-        radial-gradient(1200px 600px at 80% -10%, rgba(99,102,241,.08), transparent 60%),
-        radial-gradient(900px 500px at -10% 10%, rgba(45,212,191,.05), transparent 55%), {BG};}}
+        radial-gradient(1200px 600px at 80% -10%, rgba(0,112,243,.08), transparent 60%),
+        radial-gradient(900px 500px at -10% 10%, rgba(0,112,243,.05), transparent 55%), {BG};}}
       .block-container {{padding-top: 1rem; padding-bottom: 2.5rem; max-width: 1360px;}}
       [data-testid="stSidebar"] {{background:{PANEL2}; border-right:1px solid {GRID};}}
       .topbar {{display:flex; align-items:center; justify-content:space-between;
@@ -104,16 +105,16 @@ st.markdown(
       div[data-testid="stPlotlyChart"] > div, .js-plotly-plot, .plot-container {{
         overflow:hidden !important;}}
       div[data-testid="stPlotlyChart"]:hover, div[data-testid="stDataFrame"]:hover {{
-        border-color:rgba(99,102,241,.45);}}
+        border-color:rgba(0,112,243,.45);}}
       .pill {{display:inline-block;padding:4px 12px;border-radius:999px;
-        background:rgba(99,102,241,.14);color:{ACCENT_LT};font-size:.73rem;font-weight:700;
-        margin:3px 6px 3px 0;border:1px solid rgba(99,102,241,.22);}}
+        background:rgba(0,112,243,.14);color:{ACCENT_LT};font-size:.73rem;font-weight:700;
+        margin:3px 6px 3px 0;border:1px solid rgba(0,112,243,.22);}}
       .result {{background:linear-gradient(135deg,{PANEL} 0%,{PANEL2} 100%);border:1px solid {GRID};
         border-radius:18px;padding:22px 26px;box-shadow:0 12px 34px rgba(0,0,0,.32);}}
       .result .arm {{font-size:1.55rem;font-weight:800;color:{ACCENT_LT};letter-spacing:-.01em;}}
       .svc {{font-size:.82rem;padding:5px 0;color:{TEXT};}}
-      .stButton > button {{border-radius:12px;font-weight:700;border:1px solid rgba(99,102,241,.4);
-        box-shadow:0 8px 24px rgba(99,102,241,.25);}}
+      .stButton > button {{border-radius:12px;font-weight:700;border:1px solid rgba(0,112,243,.4);
+        box-shadow:0 8px 24px rgba(0,112,243,.25);}}
     </style>
     """,
     unsafe_allow_html=True,
@@ -355,7 +356,8 @@ st.markdown('<div class="sect">📊 Experimento</div>', unsafe_allow_html=True)
 b1, b2, b3, b4 = st.columns(4)
 b1.plotly_chart(p_hbar("cumulative_reward", "💰 Valor por política", money=True), config=NO_BAR, **fill())
 b2.plotly_chart(style_panel(regret_fig, "📉 Regret acumulado", height=GRID_H), config=NO_BAR, **fill())
-b3.plotly_chart(p_donut(pulls.index, pulls.values, "🎯 Mix de ofertas", px.colors.sequential.Purp[::-1]),
+b3.plotly_chart(p_donut(pulls.index, pulls.values, "🎯 Mix de ofertas",
+                        ["#0070F3", "#3291FF", "#1D4ED8", "#60A5FA", "#1E40AF", "#93C5FD"]),
                 config=NO_BAR, **fill())
 b4.plotly_chart(p_hbar("reward_per_1k", "⚡ Reward / 1k", money=True), config=NO_BAR, **fill())
 
@@ -488,7 +490,7 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
     with f3:
         st.markdown("**🧠 Por que esta decisão**")
         for r in rec.reasons:
-            st.markdown(f"<div style='font-size:.86rem;margin:3px 0'><b style='color:#C4BBFF'>"
+            st.markdown(f"<div style='font-size:.86rem;margin:3px 0'><b style='color:#3291FF'>"
                         f"{r['code']}</b> — {r['description']}</div>", unsafe_allow_html=True)
 
     # --- assistant (RAG) ---------------------------------------------------
@@ -502,7 +504,7 @@ st.divider()
 st.markdown(
     f'<div style="text-align:center;color:{MUTED};font-size:.82rem;padding:8px 0 4px">'
     f'<b style="color:{TEXT}">Adaptive Offers Platform</b> · © 2026 '
-    f'<b style="color:#C4BBFF">Dione Braga</b> — Grupo 64 · FIAP Pós-Tech 7MLET'
+    f'<b style="color:#3291FF">Dione Braga</b> — Grupo 64 · FIAP Pós-Tech 7MLET'
     '<br/><span style="font-size:.76rem">Licença MIT · '
     '<a href="https://github.com/dionebraga/datathon-7mlet-grupo-64" '
     'style="color:#9AA0B4;text-decoration:none">github.com/dionebraga/datathon-7mlet-grupo-64</a>'
