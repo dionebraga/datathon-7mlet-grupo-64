@@ -119,7 +119,7 @@ st.markdown(
       #MainMenu, footer, [data-testid="stToolbar"] {{visibility: hidden;}}
       html, body, [class*="css"], .stApp {{font-family:'Inter',system-ui,sans-serif;}}
       .stApp {{background:
-        linear-gradient(rgba(0,0,0,.68), rgba(0,0,0,.68)),
+        linear-gradient(rgba(0,0,0,.8), rgba(0,0,0,.8)),
         {HERO_BG}{BG};}}
       .block-container {{padding-top: 1rem; padding-bottom: 2.5rem; max-width: 1360px;}}
       [data-testid="stSidebar"] {{background:{PANEL2}; border-right:1px solid {GRID};}}

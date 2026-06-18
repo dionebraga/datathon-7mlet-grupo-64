@@ -26,7 +26,7 @@
     /* Hero background image (/hero-bg.png), fixed on pure black. A translucent
        overlay fades it so content stays readable over the glowing curve. */
     background:
-      linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)),
+      linear-gradient(rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.58)),
       url("/hero-bg.png") center / cover fixed no-repeat,
       var(--color-bg);
     color: var(--color-text);
