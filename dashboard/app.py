@@ -59,7 +59,8 @@ def hex_rgba(hex_color: str, alpha: float) -> str:
 # --------------------------------------------------------------------------- #
 # Theme constants
 # --------------------------------------------------------------------------- #
-st.set_page_config(page_title="Adaptive Offers · Observability", page_icon="🛰️", layout="wide")
+st.set_page_config(page_title="Adaptive Offers · Observability", page_icon="🛰️", layout="wide",
+                   initial_sidebar_state="expanded")
 
 # Vercel-style dark palette (pure black + electric blue + neutrals + semantics).
 BG = "#000000"
@@ -117,6 +118,7 @@ st.markdown(
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
       #MainMenu, footer, [data-testid="stToolbar"] {{visibility: hidden;}}
+      [data-testid="collapsedControl"] {{visibility: visible !important; opacity: 1 !important;}}
       html, body, [class*="css"], .stApp {{font-family:'Inter',system-ui,sans-serif;}}
       .stApp {{background:
         linear-gradient(rgba(0,0,0,.8), rgba(0,0,0,.8)),
@@ -211,34 +213,55 @@ def tile(col, label: str, value: str, series, color: str) -> None:
 
 
 def gauge(value: float, title: str, vmax: float, color: str, suffix: str = "") -> go.Figure:
+    steps = [
+        {"range": [0, vmax * 0.4], "color": hex_rgba(color, 0.07)},
+        {"range": [vmax * 0.4, vmax * 0.75], "color": hex_rgba(color, 0.14)},
+        {"range": [vmax * 0.75, vmax], "color": hex_rgba(color, 0.22)},
+    ]
     fig = go.Figure(go.Indicator(
-        mode="gauge+number", value=value,
-        number={"suffix": suffix, "font": {"size": 36, "color": TEXT, "family": "Inter"}},
-        title={"text": title, "font": {"size": 13, "color": MUTED}},
+        mode="gauge+number+delta",
+        value=value,
+        number={"suffix": suffix, "font": {"size": 32, "color": TEXT, "family": "Inter"},
+                "valueformat": ".1f"},
+        delta={"reference": vmax * 0.5, "relative": False,
+               "font": {"size": 12, "color": MUTED}, "valueformat": ".1f"},
+        title={"text": f"<b>{title}</b>", "font": {"size": 12, "color": MUTED, "family": "Inter"}},
         gauge={
-            "axis": {"range": [0, vmax], "tickwidth": 0, "tickcolor": "rgba(0,0,0,0)",
-                     "nticks": 4, "tickfont": {"color": MUTED, "size": 9}},
-            "bar": {"color": color, "thickness": 0.30, "line": {"width": 0}},
-            "bgcolor": "rgba(255,255,255,.05)", "borderwidth": 0,
-            "threshold": {"line": {"color": "#FFFFFF", "width": 2}, "thickness": 0.8, "value": value},
+            "axis": {"range": [0, vmax], "tickwidth": 0,
+                     "tickcolor": "rgba(0,0,0,0)", "showticklabels": False},
+            "bar": {"color": color, "thickness": 0.28, "line": {"width": 0}},
+            "bgcolor": "rgba(0,0,0,0)", "borderwidth": 0,
+            "steps": steps,
+            "threshold": {"line": {"color": "white", "width": 2},
+                          "thickness": 0.85, "value": value},
         },
     ))
-    fig.update_layout(height=236, margin={"l": 26, "r": 26, "t": 46, "b": 10},
-                      paper_bgcolor="rgba(0,0,0,0)", font={"color": TEXT})
+    fig.update_layout(
+        height=230, margin={"l": 20, "r": 20, "t": 40, "b": 0},
+        paper_bgcolor="rgba(0,0,0,0)", font={"color": TEXT, "family": "Inter"},
+    )
     return fig
 
 
 def style_panel(fig: go.Figure, title: str, height: int = 360) -> go.Figure:
     fig.update_layout(
         template="plotly_dark", height=height,
-        title={"text": title, "font": {"size": 14, "color": TEXT}, "x": 0.01, "xanchor": "left"},
-        margin={"l": 14, "r": 14, "t": 46, "b": 12}, paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)", font={"family": "Inter", "color": TEXT},
-        legend={"orientation": "h", "y": 1.08, "x": 0, "font": {"size": 11}},
-        hoverlabel={"bgcolor": PANEL, "bordercolor": GRID, "font_size": 12},
+        title={"text": title, "font": {"size": 13, "color": TEXT, "family": "Inter"},
+               "x": 0.01, "xanchor": "left", "pad": {"b": 4}},
+        margin={"l": 12, "r": 12, "t": 44, "b": 10},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font={"family": "Inter", "color": TEXT},
+        legend={"orientation": "h", "y": 1.10, "x": 0,
+                "font": {"size": 10, "family": "Inter"},
+                "bgcolor": "rgba(0,0,0,0)", "borderwidth": 0},
+        hoverlabel={"bgcolor": PANEL, "bordercolor": GRID, "font_size": 12,
+                    "font_family": "Inter"},
     )
-    fig.update_xaxes(showgrid=False, zeroline=False, showline=False)
-    fig.update_yaxes(gridcolor="rgba(255,255,255,.05)", zeroline=False, showline=False)
+    fig.update_xaxes(showgrid=False, zeroline=False, showline=False,
+                     tickfont=dict(size=10, color=MUTED))
+    fig.update_yaxes(gridcolor="rgba(255,255,255,.04)", zeroline=False, showline=False,
+                     tickfont=dict(size=10, color=MUTED))
     return fig
 
 
@@ -254,8 +277,8 @@ def recent_decisions(n: int = 8) -> pd.DataFrame:
     return pd.DataFrame({
         "Hora": df["ts"].str.slice(11, 19) if "ts" in df else "",
         "Oferta": df.get("arm_name", ""),
-        "Modo": df["explored"].map({True: "🔍 expl.", False: "🎯 explot."}) if "explored" in df else "",
-        "Valor": df["expected_reward"].map(lambda v: f"R$ {float(v):.1f}") if "expected_reward" in df else "",
+        "Explorado": df["explored"].fillna(False).astype(bool) if "explored" in df else False,
+        "Valor": df["expected_reward"].astype(float) if "expected_reward" in df else 0.0,
     })
 
 
@@ -331,25 +354,121 @@ PLABELS = [POLICY_LABEL.get(p, p) for p in sdf["policy"]]
 PCOLORS = [POLICY_COLORS.get(p, VIOLET) for p in sdf["policy"]]
 
 
-def p_hbar(value_col: str, title: str, money: bool = False) -> go.Figure:
+def p_lollipop(value_col: str, title: str, money: bool = False) -> go.Figure:
+    """Horizontal lollipop — cleaner than bars for ranked policy comparisons."""
     o = sdf.sort_values(value_col)
-    txt = [f"R$ {v:,.0f}" if money else (f"{v:.1%}" if v < 1 else f"{v:,.1f}") for v in o[value_col]]
-    fig = go.Figure(go.Bar(x=o[value_col], y=[POLICY_LABEL.get(p, p) for p in o["policy"]],
-                           orientation="h", marker_color=[POLICY_COLORS.get(p, VIOLET) for p in o["policy"]],
-                           text=txt, textposition="auto"))
+    labels = [POLICY_LABEL.get(p, p) for p in o["policy"]]
+    values = o[value_col].tolist()
+    colors = [POLICY_COLORS.get(p, VIOLET) for p in o["policy"]]
+    fmt = lambda v: f"R$ {v:,.0f}" if money else (f"{v:.1%}" if v < 1 else f"{v:,.1f}")
+    txt = [fmt(v) for v in values]
+    max_v = max(values) if values else 1
+    fig = go.Figure()
+    for i, (v, c) in enumerate(zip(values, colors)):
+        fig.add_shape(type="line", x0=0, x1=v, y0=i, y1=i,
+                      line=dict(color=hex_rgba(c, 0.35), width=2, dash="dot"))
+    fig.add_trace(go.Scatter(
+        x=values, y=labels, mode="markers+text",
+        marker=dict(size=13, color=colors, line=dict(color="white", width=1.5)),
+        text=txt, textposition="middle right",
+        textfont=dict(size=10, color=TEXT, family="Inter"),
+        hovertemplate="%{y}: %{text}<extra></extra>",
+    ))
+    fig.update_xaxes(range=[0, max_v * 1.55], showticklabels=False)
+    fig.update_yaxes(automargin=True, tickfont=dict(size=11, color=TEXT))
     return style_panel(fig, title, height=GRID_H)
 
 
-def p_vbar(x, y, title: str, color: str, pct: bool = True) -> go.Figure:
-    fig = go.Figure(go.Bar(x=list(x), y=list(y), marker_color=color,
-                           text=[f"{v:.1%}" if pct else f"{v:,.0f}" for v in y], textposition="outside"))
+def p_lollipop_v(x, y, title: str, color: str) -> go.Figure:
+    """Vertical lollipop — for categorical dataset signals."""
+    x_l, y_l = list(x), list(y)
+    max_y = max(y_l) if y_l else 1
+    fig = go.Figure()
+    for xi, yi in zip(x_l, y_l):
+        fig.add_shape(type="line", x0=xi, x1=xi, y0=0, y1=yi,
+                      line=dict(color=hex_rgba(color, 0.35), width=2, dash="dot"))
+    fig.add_trace(go.Scatter(
+        x=x_l, y=y_l, mode="markers+text",
+        marker=dict(size=13, color=color, line=dict(color="white", width=1.5)),
+        text=[f"{v:.1%}" for v in y_l], textposition="top center",
+        textfont=dict(size=10, color=TEXT, family="Inter"),
+        hovertemplate="%{x}: %{text}<extra></extra>",
+    ))
+    fig.update_xaxes(automargin=True, tickfont=dict(size=10, color=TEXT))
+    fig.update_yaxes(tickformat=".0%", range=[0, max_y * 1.35], showgrid=False, zeroline=False)
     return style_panel(fig, title, height=GRID_H)
 
 
-def p_donut(labels, values, title: str, colors) -> go.Figure:
-    fig = go.Figure(go.Pie(labels=list(labels), values=list(values), hole=.62,
-                           marker={"colors": colors}, textinfo="percent"))
-    return style_panel(fig, title, height=GRID_H).update_layout(showlegend=False)
+def p_treemap(labels, values, title: str, colors) -> go.Figure:
+    """Treemap — intuitive part-of-whole for offer mix."""
+    fig = go.Figure(go.Treemap(
+        labels=list(labels), parents=[""] * len(list(labels)),
+        values=list(values),
+        marker=dict(colors=list(colors), line=dict(width=2, color=BG),
+                    cornerradius=6),
+        textinfo="label+percent root",
+        textfont=dict(size=12, color="white", family="Inter"),
+        hovertemplate="%{label}<br>%{value:,} pulls · %{percentRoot:.1%}<extra></extra>",
+    ))
+    fig.update_layout(
+        height=GRID_H, margin=dict(l=4, r=4, t=38, b=4),
+        paper_bgcolor="rgba(0,0,0,0)",
+        title=dict(text=title, font=dict(size=13, color=TEXT), x=0.01, xanchor="left"),
+    )
+    return fig
+
+
+def p_radar(title: str) -> go.Figure:
+    """Radar/spider — multi-metric policy comparison, labels always visible."""
+    met = ["conversion_rate", "reward_per_1k", "exploration_rate", "lift_vs_baseline_pct"]
+    met_labels = ["Conv.", "Reward/1k", "Explor.", "Lift"]
+    maxv = [sdf[m].max() or 1 for m in met]
+    fig = go.Figure()
+    for _, row in sdf.iterrows():
+        pol = row["policy"]
+        vals = [row[m] / mv * 100 for m, mv in zip(met, maxv)]
+        vals += [vals[0]]
+        lbl = POLICY_LABEL.get(pol, pol)
+        fig.add_trace(go.Scatterpolar(
+            r=vals, theta=met_labels + [met_labels[0]],
+            fill="toself",
+            fillcolor=hex_rgba(POLICY_COLORS.get(pol, VIOLET), 0.15),
+            line=dict(color=POLICY_COLORS.get(pol, VIOLET), width=2.2),
+            name=lbl,
+            hovertemplate=f"<b>{lbl}</b><br>%{{theta}}: %{{r:.0f}}%<extra></extra>",
+        ))
+    fig.update_layout(
+        polar=dict(
+            domain=dict(x=[0.05, 0.95], y=[0.12, 1.0]),
+            bgcolor="rgba(0,0,0,0)",
+            radialaxis=dict(
+                visible=True, range=[0, 100],
+                showticklabels=False,
+                gridcolor=hex_rgba(GRID, 1.0),
+                linecolor=hex_rgba(GRID, 0.6),
+                nticks=5,
+            ),
+            angularaxis=dict(
+                tickfont=dict(size=12, color=TEXT, family="Inter"),
+                gridcolor=hex_rgba(GRID, 0.8),
+                linecolor=hex_rgba(GRID, 0.6),
+                rotation=90,
+                direction="clockwise",
+            ),
+        ),
+        height=GRID_H,
+        margin=dict(l=10, r=10, t=36, b=6),
+        paper_bgcolor="rgba(0,0,0,0)",
+        showlegend=True,
+        legend=dict(
+            orientation="h", x=0.5, xanchor="center", y=0.07,
+            font=dict(size=10, color=TEXT, family="Inter"),
+            bgcolor="rgba(0,0,0,0)", borderwidth=0,
+        ),
+        title=dict(text=title, font=dict(size=13, color=TEXT), x=0.01, xanchor="left"),
+        hoverlabel=dict(bgcolor=PANEL, bordercolor=GRID, font_size=12),
+    )
+    return fig
 
 
 def p_stat(col, title: str, rows: list[tuple[str, str]]) -> None:
@@ -373,11 +492,22 @@ by_contact = target_rate_by(processed, "contact")["subscription_rate"]
 pulls = pd.Series(best_res.arm_pulls)
 pulls = pulls[pulls > 0].sort_values(ascending=False)
 regret_fig = go.Figure()
+_best_idx, _best_cum = regret_curve(best_res, points=70)
+_base_idx, _base_cum = regret_curve(base_res, points=70)
+regret_fig.add_trace(go.Scatter(
+    x=np.concatenate([_best_idx, _base_idx[::-1]]),
+    y=np.concatenate([_best_cum, _base_cum[::-1]]),
+    fill="toself", fillcolor=hex_rgba(GREEN, 0.07),
+    line=dict(width=0), showlegend=False, hoverinfo="skip",
+))
 for name, res in results.items():
     idx, cum = regret_curve(res, points=70)
-    regret_fig.add_trace(go.Scatter(x=idx, y=cum, mode="lines", name=POLICY_LABEL.get(name, name),
-                                    line={"width": 2.4, "color": POLICY_COLORS.get(name, VIOLET),
-                                          "shape": "spline", "smoothing": 0.5}))
+    regret_fig.add_trace(go.Scatter(
+        x=idx, y=cum, mode="lines", name=POLICY_LABEL.get(name, name),
+        line={"width": 2.4, "color": POLICY_COLORS.get(name, VIOLET),
+              "shape": "spline", "smoothing": 0.5},
+        hovertemplate=f"<b>{POLICY_LABEL.get(name, name)}</b><br>step %{{x}}: %{{y:,.0f}}<extra></extra>",
+    ))
 
 # --- Grid row A: gauges ---------------------------------------------------- #
 st.markdown('<div class="sect">🎛️ Indicadores</div>', unsafe_allow_html=True)
@@ -391,28 +521,26 @@ a4.plotly_chart(gauge(best.get("lift_vs_baseline_pct", 0), "Lift vs baseline", 1
 # --- Grid row B: experiment ------------------------------------------------ #
 st.markdown('<div class="sect">📊 Experimento</div>', unsafe_allow_html=True)
 b1, b2, b3, b4 = st.columns(4)
-b1.plotly_chart(p_hbar("cumulative_reward", "💰 Valor por política", money=True), config=NO_BAR, **fill())
-b2.plotly_chart(style_panel(regret_fig, "📉 Regret acumulado", height=GRID_H), config=NO_BAR, **fill())
-b3.plotly_chart(p_donut(pulls.index, pulls.values, "🎯 Mix de ofertas",
-                        ["#0070F3", "#3291FF", "#1D4ED8", "#60A5FA", "#1E40AF", "#93C5FD"]),
+b1.plotly_chart(p_lollipop("cumulative_reward", "💰 Valor total por política", money=True), config=NO_BAR, **fill())
+b2.plotly_chart(style_panel(regret_fig, "📉 Regret acumulado (área = ganho do melhor)", height=GRID_H), config=NO_BAR, **fill())
+b3.plotly_chart(p_treemap(pulls.index, pulls.values, "🎯 Mix de ofertas (pulls)",
+                           ["#0070F3", "#3291FF", "#1D4ED8", "#60A5FA", "#1E40AF", "#93C5FD"]),
                 config=NO_BAR, **fill())
-b4.plotly_chart(p_hbar("reward_per_1k", "⚡ Reward / 1k", money=True), config=NO_BAR, **fill())
+b4.plotly_chart(p_lollipop("reward_per_1k", "⚡ Reward / 1k impressões", money=True), config=NO_BAR, **fill())
 
 # --- Grid row C: dataset signals ------------------------------------------- #
 st.markdown('<div class="sect">🧬 Sinais da base</div>', unsafe_allow_html=True)
 c1, c2, c3, c4 = st.columns(4)
-c1.plotly_chart(p_vbar(by_pout.index, by_pout.values, "Conversão · poutcome", CYAN), config=NO_BAR, **fill())
-c2.plotly_chart(p_vbar(by_contact.index, by_contact.values, "Conversão · canal", GREEN), config=NO_BAR, **fill())
-c3.plotly_chart(p_vbar(by_age.index.astype(str), by_age.values, "Conversão · faixa etária", AMBER),
-                config=NO_BAR, **fill())
-c4.plotly_chart(p_donut([POLICY_LABEL.get(p, p) for p in sdf["policy"]], sdf["conversion_rate"],
-                        "Conversão por política", PCOLORS), config=NO_BAR, **fill())
+c1.plotly_chart(p_lollipop_v(by_pout.index, by_pout.values, "Conversão · resultado anterior", CYAN), config=NO_BAR, **fill())
+c2.plotly_chart(p_lollipop_v(by_contact.index, by_contact.values, "Conversão · canal de contato", GREEN), config=NO_BAR, **fill())
+c3.plotly_chart(p_lollipop_v(by_age.index.astype(str), by_age.values, "Conversão · faixa etária", AMBER), config=NO_BAR, **fill())
+c4.plotly_chart(p_radar("🕸️ Comparação multi-métrica por política"), config=NO_BAR, **fill())
 
 # --- Grid row D: comparison + ops ------------------------------------------ #
 st.markdown('<div class="sect">🧭 Comparação & operação</div>', unsafe_allow_html=True)
 d1, d2, d3, d4 = st.columns(4)
-d1.plotly_chart(p_hbar("exploration_rate", "🔍 Exploração por política"), config=NO_BAR, **fill())
-d2.plotly_chart(p_hbar("regret_ratio", "🎯 Regret ratio por política"), config=NO_BAR, **fill())
+d1.plotly_chart(p_lollipop("exploration_rate", "🔍 Taxa de exploração por política"), config=NO_BAR, **fill())
+d2.plotly_chart(p_lollipop("regret_ratio", "🎯 Regret ratio por política"), config=NO_BAR, **fill())
 p_stat(d3, "📦 Base factual", [
     ("Registros", f"{qrep['n_rows']:,}"),
     ("Conversão", f"{qrep['target']['positive_rate']:.1%}"),
@@ -426,7 +554,41 @@ with d4:
     if feed.empty:
         st.caption("Sem decisões ainda — use o explorador abaixo.")
     else:
-        st.dataframe(feed, hide_index=True, height=GRID_H - 40, **fill())
+        _colors = [CYAN if exp else GREEN for exp in feed["Explorado"]]
+        _mode   = ["🔍 exploração" if exp else "🎯 explotação" for exp in feed["Explorado"]]
+        _fig = go.Figure(go.Bar(
+            x=feed["Valor"],
+            y=feed["Oferta"],
+            orientation="h",
+            marker_color=_colors,
+            marker_line_width=0,
+            text=[f"R$ {v:.0f}" for v in feed["Valor"]],
+            textposition="inside",
+            insidetextanchor="middle",
+            textfont={"size": 11, "color": "#000000"},
+            customdata=list(zip(_mode, feed["Hora"])),
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "%{customdata[0]}<br>"
+                "Hora: %{customdata[1]}<br>"
+                "Valor esperado: R$ %{x:.1f}"
+                "<extra></extra>"
+            ),
+        ))
+        _fig.update_layout(
+            height=GRID_H - 10,
+            margin={"l": 4, "r": 10, "t": 6, "b": 4},
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font={"family": "Inter", "color": TEXT},
+            xaxis={"visible": False},
+            yaxis={
+                "tickfont": {"size": 10, "color": TEXT},
+                "automargin": True,
+            },
+            hoverlabel={"bgcolor": PANEL, "bordercolor": GRID, "font_size": 12},
+        )
+        st.plotly_chart(_fig, config=NO_BAR, **fill())
 
 # --------------------------------------------------------------------------- #
 # Decision explorer
