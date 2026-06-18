@@ -66,6 +66,9 @@ artifacts/
 *.pth
 *.onnx
 
+# ---- Pitch deck build scratch (node_modules, render PNGs, scripts) ----
+.pptx-build/
+
 # ---- OS / editor ----
 .DS_Store
 Thumbs.db
