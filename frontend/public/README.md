@@ -3,7 +3,10 @@
 Arquivos estáticos servidos pelo Next.js.
 
 ## Imagem de fundo (hero)
-Salve a imagem de fundo aqui como **`hero-bg.png`** (ou `.jpg` — ajuste o nome
-em `app/globals.css`, regra `body::before`). Ela é exibida com **opacidade ~16%**
-(transparência leve) atrás do conteúdo. Se o arquivo não existir, o fundo usa um
-gradiente azul sutil como fallback — nada quebra.
+A imagem de fundo é o arquivo **`hero-bg.png`**. Ela é aplicada como background
+fixo do `body` em `app/globals.css` (regra `html, body`), esmaecida por um
+overlay preto translúcido (~45%) para o conteúdo continuar legível por cima.
+
+Para trocar a imagem, basta substituir `hero-bg.png` (mesmo nome). O dashboard
+Streamlit reutiliza esse mesmo arquivo, reduzindo-o automaticamente para um
+embed leve.

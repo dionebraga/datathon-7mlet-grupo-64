@@ -79,19 +79,34 @@ POLICY_LABEL = {"linucb": "LinUCB", "thompson": "Thompson", "nilos_ucb": "Nilos-
 def _hero_bg_layer() -> str:
     """CSS background-image layer (base64 data URI) for the hero image.
 
-    Prefers the user's own file in ``frontend/public/`` and falls back to the
-    generated SVG; returns ``""`` (no layer) if none exists. The image is later
-    dimmed by a translucent black overlay so it reads as a subtle backdrop.
+    Reads the user's image from ``frontend/public/`` and, since the data URI is
+    re-sent on every rerun, downscales large files to keep it light. Returns
+    ``""`` (no layer) if none exists; the image is later dimmed by a translucent
+    black overlay so it reads as a subtle backdrop.
     """
     import base64
+    import io
 
     public = ROOT / "frontend" / "public"
     for name, mime in (("hero-bg.png", "image/png"), ("hero-bg.jpg", "image/jpeg"),
-                       ("hero-bg.jpeg", "image/jpeg"), ("hero-bg.svg", "image/svg+xml")):
+                       ("hero-bg.jpeg", "image/jpeg")):
         f = public / name
-        if f.exists():
-            b64 = base64.b64encode(f.read_bytes()).decode("ascii")
-            return f'url("data:{mime};base64,{b64}") center/cover fixed no-repeat, '
+        if not f.exists():
+            continue
+        data = f.read_bytes()
+        if len(data) > 600_000:  # heavy asset → re-encode a lighter copy for the embed
+            try:
+                from PIL import Image
+
+                im = Image.open(io.BytesIO(data)).convert("RGB")
+                im.thumbnail((1920, 1920))
+                buf = io.BytesIO()
+                im.save(buf, format="JPEG", quality=82, optimize=True)
+                data, mime = buf.getvalue(), "image/jpeg"
+            except Exception:
+                pass
+        b64 = base64.b64encode(data).decode("ascii")
+        return f'url("data:{mime};base64,{b64}") center/cover fixed no-repeat, '
     return ""
 
 
@@ -104,7 +119,7 @@ st.markdown(
       #MainMenu, footer, [data-testid="stToolbar"] {{visibility: hidden;}}
       html, body, [class*="css"], .stApp {{font-family:'Inter',system-ui,sans-serif;}}
       .stApp {{background:
-        linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,.6)),
+        linear-gradient(rgba(0,0,0,.68), rgba(0,0,0,.68)),
         {HERO_BG}{BG};}}
       .block-container {{padding-top: 1rem; padding-bottom: 2.5rem; max-width: 1360px;}}
       [data-testid="stSidebar"] {{background:{PANEL2}; border-right:1px solid {GRID};}}

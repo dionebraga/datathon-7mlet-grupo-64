@@ -23,13 +23,11 @@
   html,
   body {
     min-height: 100%;
-    /* Hero background image (user's /hero-bg.png if present, else generated SVG),
-       fixed on pure black. A light overlay keeps content readable while letting
-       the neon curve — including its bright white core — show through. */
+    /* Hero background image (/hero-bg.png), fixed on pure black. A translucent
+       overlay fades it so content stays readable over the glowing curve. */
     background:
-      linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)),
+      linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)),
       url("/hero-bg.png") center / cover fixed no-repeat,
-      url("/hero-bg.svg") center / cover fixed no-repeat,
       var(--color-bg);
     color: var(--color-text);
     font-family: var(--font-sans);
