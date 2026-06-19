@@ -66,27 +66,35 @@ pendente; a política só aprende com recompensas maturadas. Detalhes em
 
 ## 5. Comparação quantitativa
 
-Facsimile, 20.000 rounds, 40% delayed (seed=123):
+Base real (UCI Bank Marketing — **41.188 contatos**, `provenance="real"`), 6.000
+rounds, 40% delayed (seed=123):
 
 | Política | Reward | Reward/1k | Regret ratio | Conversão | Exploração | Lift vs baseline |
 |---|---:|---:|---:|---:|---:|---:|
-| **LinUCB** | **424.820** | 21.241 | **5,1%** | 9,9% | 10,9% | **+66,6%** |
-| Thompson | 389.180 | 19.459 | 12,2% | 7,5% | 4,7% | +52,6% |
-| Nilos-UCB | 383.010 | 19.150 | 14,1% | 7,2% | 15,0% | +50,2% |
-| Baseline | 255.060 | 12.753 | 42,7% | 10,7% | 0,0% | — |
+| Thompson | **114.290** | 19.048 | 11,8% | 7,1% | 11,7% | **+9,2%** |
+| **LinUCB** | 113.230 | 18.872 | **8,3%** | **9,1%** | 26,4% | +8,2% |
+| Baseline | 104.700 | 17.450 | 10,9% | 6,2% | 0,0% | — |
+| Nilos-UCB | 102.020 | 17.003 | 17,0% | 7,1% | 29,1% | **−2,6%** |
+
+> Honestidade: na base real o ganho é **modesto (single digits)**, não os ~+60%
+> que o fac-símile produzia. O resultado de **uma** seed é ruidoso.
+
+**Robustez (5 seeds · 6.000 rounds)** — medindo a média, **o LinUCB lidera**:
+reward médio **110.046**, vence **3/5**, e é **o mais estável (CV 2,97%)**, contra
+Thompson (105.512; CV 7,07%; 2/5), Nilos-UCB (99.800; 0/5) e Baseline (87.616; CV
+**20,2%** — instável, o que explica por que numa seed isolada ele parece forte).
 
 **Evidências adicionais** (`reports/offline-evaluation.md`):
-- **Golden set** (24 casos): LinUCB **100%** (8/8 típicos, 6/6 segmento, 5/5 borda,
-  **5/5 adversariais**); não-contextuais ~54% → o gate **discrimina**.
-- **Sensibilidade**: CV de reward do LinUCB **1,9%** (estável a seeds).
-- **IPS/SNIPS** off-policy ≈ **21,0/impressão**, concordando com a simulação
-  on-policy (~21,2) — validação independente.
+- **Golden set** (24 casos): **83,3%** (5/8 típicos, **6/6 segmento**, 4/5 borda,
+  **5/5 adversariais**) — segmento e adversarial seguem em 100%.
+- **Estabilidade**: CV de reward do LinUCB **2,97%** entre seeds (o mais estável).
 - **Fairness**: disparidade de exposição **0,00** (sem negação de oferta).
 
 **Métricas específicas e justificativa**: priorizamos **reward/regret ponderados
-por margem** (valor de negócio) sobre acurácia/conversão crua — o baseline tem a
-**maior conversão** mas o **menor valor**, ilustrando por que conversão isolada
-engana.
+por margem** (valor de negócio). O **baseline colapsa ~85% das decisões no
+Empréstimo** (maior margem) ignorando o contexto; o **LinUCB diversifica pelo
+contexto** e entrega **menor regret (8,3%) e maior conversão (9,1%)** — por isso é
+a política recomendada, mesmo com lift de valor modesto.
 
 ## 6. Arquitetura-alvo Azure
 
@@ -96,7 +104,8 @@ Operação **exclusivamente Azure** (`docs/architecture-azure.md`): Container Ap
 AI Search (assistente/RAG), Azure ML + MLflow + ACR (MLOps), App Insights
 (observabilidade), **Key Vault + Managed Identity + Entra ID** (segredos/identidade
 sem senha), Defender (postura). FinOps: escala a zero e cache de explicações como
-maiores alavancas; ROI sustentado pelo +66,6% de valor sobre o volume.
+maiores alavancas; ROI sustentado pelo ganho de valor do aprendizado (modesto,
+porém positivo e estável) diluído sobre o volume.
 
 ## 7. Ciclo MLOps
 
@@ -107,9 +116,14 @@ monitoramento de **drift** (PSI/KS) e **reward** (control chart) com gatilho de
 retreino/rollback. CI (lint+test+pipeline smoke) e CD (build/push imagem).
 
 ## 8. Limitações
-- Dados sintéticos: comparam políticas, **não** estimam *lift* financeiro real.
-- IPS tem variância alta sob baixa sobreposição (match ~17%; SNIPS mitiga).
-- Modelo latente estacionário; *drift* injetado só em testes de monitoramento.
+- **Base real (UCI), mas camada de ofertas/recompensas sintética**: comparamos
+  políticas em simulação com contextos reais — **não** estimamos *lift* financeiro
+  de produção.
+- **Golden set real = 83,3%** (abaixo do gate de 0,95): adversarial e segmento
+  seguem 100%, mas casos típicos/borda exigem ajuste antes de promover — limitação
+  assumida, não mascarada.
+- O *lift* sobre o baseline é **modesto e sensível à seed** (baseline com CV ~20%).
+- Modelo latente de oferta estacionário; *drift* injetado só em testes de monitoramento.
 - **Não** pronto para produção financeira regulada.
 
 ## 9. Riscos e mitigação
@@ -119,8 +133,9 @@ suitability — mitigados por gate de elegibilidade, validação de schema, RAG 
 Privacidade e atributos protegidos em `docs/lgpd-plan.md`.
 
 ## 10. Hipóteses
-- O ganho relativo entre políticas (LinUCB > não-contextuais > baseline) se mantém
-  na base real; magnitudes variam.
+- **Testado na base real**: o LinUCB lidera na média e tem o menor regret, mas as
+  magnitudes caíram para single digits e o Nilos-UCB ficou **abaixo** do baseline —
+  nem todo bandit vence.
 - A margem é conhecida por oferta e estável no horizonte de decisão.
 - Recompensas atrasadas maturam dentro do horizonte de 30 dias.
 

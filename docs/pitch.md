@@ -36,9 +36,12 @@ Decisão de oferta em canais digitais com multi-armed bandits.
 - *Plano de contingência*: gravação versionada caso a demo ao vivo falhe.
 
 ## Slide 7 — Evidências
-- **LinUCB +66,6%** de valor vs baseline; **regret 5,1%**.
-- Golden set **100%** (inclui 5/5 adversariais); CV de reward **1,9%**.
-- **IPS off-policy** concorda com a simulação (~21/impressão).
+- Base **real** (UCI, 41.188 contatos). Ganho **modesto e honesto**: melhor
+  política **+9,2%** de valor vs baseline; **LinUCB** com **menor regret (8,3%)** e
+  **maior conversão (9,1%)**.
+- **Robustez (5 seeds)**: LinUCB lidera na média (vence 3/5, o mais estável, CV
+  **2,97%**). **Nem todo bandit vence**: Nilos-UCB ficou **abaixo** do baseline.
+- Golden set **83,3%** (adversariais **5/5**, segmento **6/6**).
 - Fairness: disparidade de exposição **0,00**.
 
 ## Slide 8 — Arquitetura técnica (Azure) + alternativas
@@ -62,6 +65,9 @@ Decisão de oferta em canais digitais com multi-armed bandits.
 
 ### Q&A — perguntas prováveis
 - *Por que não A/B?* Bandit reduz regret e reage a contexto.
-- *Conversão do baseline é alta — por quê perde?* Ignora margem/contexto.
+- *O ganho não é pequeno (~+9%)?* É honesto e realista; o LinUCB ainda entrega o
+  **menor regret** e a **maior conversão**, e lidera na média de seeds.
+- *Por que o baseline perde?* Colapsa ~85% no Empréstimo (margem) e ignora o
+  contexto; os bandits diversificam pelo perfil do cliente.
 - *E sem o LLM?* Decisão independe dele; *fallback* determinístico.
 - *Como promover nova política?* Approval gate + canary + rollback (MLOps).

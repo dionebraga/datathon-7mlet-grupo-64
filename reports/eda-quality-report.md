@@ -2,9 +2,12 @@
 
 > Reprodutível via `notebooks/01_eda.ipynb` ou
 > `python -c "from adaptive_offers.data.quality import quality_report; ..."`.
-> Números abaixo referem-se ao **facsimile determinístico** (`seed=42`,
-> `n=20.000`). Com a base Kaggle **real**, rode o build e regenere o notebook;
-> as conclusões qualitativas (drivers de conversão) se mantêm.
+> ⚠️ A base canônica do projeto agora é a **real** (UCI Bank Marketing, **41.188
+> contatos**, `provenance="real"`). Os números **desta página** ainda refletem o
+> **fac-símile determinístico** (`seed=42`, `n=20.000`) usado offline/CI — rode o
+> build + regenere o notebook para a EDA da base real. Os drivers qualitativos
+> (idade, sucesso prévio, juros) se mantêm; na base real a conversão por idade tem
+> forte salto nos **60+** (aposentados ~45%).
 
 ## 1. Visão geral
 

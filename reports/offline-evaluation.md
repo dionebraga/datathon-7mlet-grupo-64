@@ -21,54 +21,58 @@
 piso de recompensa, `oracle_top3`, justificativa e critério **pass/fail**.
 Invariantes em todos: oferta **elegível** + **reason codes** presentes.
 
-### Pass-rate por política (treino horizon=12.000, seed=7)
+### Pass-rate na base real (`adaptive-offers evaluate`)
 
-| Política | Pass-rate | typical | segment | edge | adversarial |
-|---|---:|:--:|:--:|:--:|:--:|
-| **linucb** | **1.000** | 8/8 | 6/6 | 5/5 | **5/5** |
-| thompson | 0.542 | 2/8 | 4/6 | 2/5 | 5/5 |
-| nilos_ucb | 0.542 | 2/8 | 4/6 | 2/5 | 5/5 |
-| baseline | 0.542 | 2/8 | 4/6 | 2/5 | 5/5 |
+Política recomendada (LinUCB) na base real: **pass-rate 83,3% (20/24)**.
 
-**Leitura**: o golden set **discrimina** — a política contextual (LinUCB) acerta
-todos os casos típicos/segmento e **todos os guardrails adversariais**; políticas
-não-contextuais passam só nos guardrails e em poucos típicos. Todos respeitam os
-gates de elegibilidade (nenhuma oferta inelegível em casos adversariais).
+| Categoria | Resultado |
+|---|:--:|
+| typical | 5/8 |
+| **segment** | **6/6** |
+| edge | 4/5 |
+| **adversarial** | **5/5** |
 
-## 3. Matriz de métricas (20.000 rounds, seed=123)
+**Leitura**: os guardrails **adversariais (5/5) e de segmento (6/6) seguem 100%** —
+o sistema respeita elegibilidade e suitability em todos os casos críticos. Os casos
+**típicos/borda** caem em contextos reais (mais heterogêneos), o que mantém o golden
+**abaixo do gate de 0,95** — limitação assumida (ver `reports/technical-report.md`).
+
+## 3. Matriz de métricas — base real (UCI · 41.188 contatos · 6.000 rounds, seed=123)
 
 | Política | Reward | Reward/1k | Regret ratio | Conversão | Exploração | Lift vs baseline |
 |---|---:|---:|---:|---:|---:|---:|
-| linucb | 424.820 | 21.241 | 5,1% | 9,9% | 10,9% | **+66,6%** |
-| thompson | 389.180 | 19.459 | 12,2% | 7,5% | 4,7% | +52,6% |
-| nilos_ucb | 383.010 | 19.150 | 14,1% | 7,2% | 15,0% | +50,2% |
-| baseline | 255.060 | 12.753 | 42,7% | 10,7% | 0,0% | — |
+| thompson | **114.290** | 19.048 | 11,8% | 7,1% | 11,7% | **+9,2%** |
+| linucb | 113.230 | 18.872 | **8,3%** | **9,1%** | 26,4% | +8,2% |
+| baseline | 104.700 | 17.450 | 10,9% | 6,2% | 0,0% | — |
+| nilos_ucb | 102.020 | 17.003 | 17,0% | 7,1% | 29,1% | **−2,6%** |
 
-## 4. Análise de sensibilidade (robustez)
+Numa seed o Thompson ficou à frente por pouco; **na média de 5 seeds o LinUCB
+lidera** (§4), com o menor regret e a maior conversão — a política recomendada. O
+ganho de valor é **modesto e honesto** (single digits), não os ~+60% do fac-símile.
 
-LinUCB sobre seeds {1, 7, 42}, horizon 12.000:
+## 4. Análise de sensibilidade (robustez) — base real
 
-| Métrica | Média | Desvio | CV |
-|---|---:|---:|---:|
-| Reward acumulado | 255.477 | 4.963 | **1,9%** |
-| Regret acumulado | 17.656 | 4.797 | — |
+Todas as políticas sobre seeds {123, 7, 42, 99, 2024}, horizon 6.000:
 
-Coeficiente de variação de **1,9%** ⇒ resultado **estável** a perturbações de
-semente; a vantagem do LinUCB não é artefato de uma única execução.
+| Política | Reward médio | CV | Vitórias |
+|---|---:|---:|:--:|
+| **LinUCB** | **110.046** | **2,97%** | **3/5** |
+| Thompson | 105.512 | 7,07% | 2/5 |
+| Nilos-UCB | 99.800 | 5,29% | 0/5 |
+| Baseline | 87.616 | 20,24% | 0/5 |
+
+O **LinUCB** é o mais **estável** (menor CV) e vence na maioria das seeds; o
+**baseline é instável** (CV ~20%) — por isso numa execução isolada ele às vezes
+parece competitivo. A liderança do LinUCB **não é artefato de uma única seed**.
 
 ## 5. Validação off-policy (IPS / SNIPS)
 
-Estimadores *Inverse Propensity Scoring* sobre os eventos logados (propensities
-registradas no Stage 2), subamostra de 6.000 eventos:
+A metodologia (estimadores *Inverse Propensity Scoring* sobre os eventos logados,
+com as propensities registradas no Stage 2) permanece implementada e válida.
 
-| Estimador | Valor/impressão | Match rate | Amostra efetiva |
-|---|---:|---:|---:|
-| V_IPS | 21,05 | 16,9% | 1.015 |
-| V_SNIPS | 21,68 | — | — |
-
-**Convergência independente**: o IPS off-policy (~21,0/impressão) bate com o
-`reward_per_1k`/1000 do simulador on-policy (~21,2/impressão). Duas metodologias
-distintas concordam ⇒ confiança no ganho estimado.
+> ⚠️ **Pendente de recomputação na base real.** Os valores absolutos de IPS/SNIPS
+> aqui exibidos eram do fac-símile e foram **removidos** para não induzir a erro.
+> Rode `adaptive-offers evaluate` para os números atuais.
 
 ## 6. Fairness de exposição entre segmentos
 

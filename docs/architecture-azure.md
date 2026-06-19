@@ -110,9 +110,9 @@ flowchart TB
 | PostgreSQL | armazenamento/IOPS | retenção/particionamento de logs | retenção curta + arquivamento em ADLS |
 | AI Search | tier/índice | réplicas no pico | tier free/básico p/ corpus pequeno |
 
-- **ROI**: o ganho medido (+66,6% de valor vs baseline em simulação) sobre o
-  volume de impressões dilui o custo de compute/LLM rapidamente; o LLM é usado
-  **apenas** para explicação/governança (custo marginal).
+- **ROI**: o ganho medido na base real (modesto, ~+8–9% de valor vs baseline em
+  simulação; LinUCB com menor regret) sobre o volume de impressões dilui o custo de
+  compute/LLM; o LLM é usado **apenas** para explicação/governança (custo marginal).
 - **TCO**: dominado por Container Apps + Azure OpenAI; Redis/PG/Search são
   secundários no porte do protótipo. Escala a zero e cache de explicações são as
   duas maiores alavancas de redução.

@@ -68,8 +68,8 @@ braço; treina online de um *replay buffer* (SGD em mini-batch). A **exploraçã
 usa **MC-dropout** (Gal & Ghahramani, 2016; Riquelme et al., 2018): um *forward*
 estocástico com dropout ligado equivale a uma amostra de Thompson neural.
 
-**Resultado honesto** (facsimile, seed=123, 6.000 rounds): o neural bate o
-baseline (**+31,2%**, regret 0,249) mas fica **atrás do LinUCB** (+59,9%). Isso é
+**Resultado** (fac-símile, didático — o neural ainda não foi re-rodado na base
+real): o neural bate o baseline mas fica **atrás do LinUCB linear**. Isso é
 esperado e didático: redes neurais são mais flexíveis (capturam não-linearidades)
 porém **data-hungry** — em horizontes curtos o LinUCB linear é mais eficiente em
 amostra. Com mais dados/treino o neural tende a fechar o *gap*. Justifica o uso de
@@ -83,25 +83,27 @@ amostra. Com mais dados/treino o neural tende a fechar o *gap*. Justifica o uso 
   conversões maturam após 1–30 rounds e **só então** atualizam a política. Decisões
   são tomadas com informação parcial — realismo de canais digitais.
 
-## 4. Resultados (facsimile, seed=123, 20.000 rounds, 40% delayed)
+## 4. Resultados (base real UCI · seed=123, 6.000 rounds, 40% delayed)
 
-| Política | Reward acumulado | Reward/1k | Regret acum. | Regret ratio | Conversão | Exploração | Lift vs baseline |
+| Política | Reward acum. | Reward/1k | Regret acum. | Regret ratio | Conversão | Exploração | Lift vs baseline |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| **linucb** | **424.820** | 21.241 | **22.890** | **5,1%** | 9,9% | 10,9% | **+66,6%** |
-| thompson | 389.180 | 19.459 | 55.452 | 12,2% | 7,5% | 4,7% | +52,6% |
-| nilos_ucb | 383.010 | 19.150 | 63.767 | 14,1% | 7,2% | 15,0% | +50,2% |
-| baseline | 255.060 | 12.753 | 193.694 | 42,7% | 10,7% | 0,0% | — |
+| thompson | **114.290** | 19.048 | 14.070 | 11,8% | 7,1% | 11,7% | **+9,2%** |
+| **linucb** | 113.230 | 18.872 | **9.967** | **8,3%** | **9,1%** | 26,4% | +8,2% |
+| baseline | 104.700 | 17.450 | 13.029 | 10,9% | 6,2% | 0,0% | — |
+| nilos_ucb | 102.020 | 17.003 | 20.347 | 17,0% | 7,1% | 29,1% | **−2,6%** |
+
+**Robustez (5 seeds)**: o LinUCB lidera na média (reward **110.046**, vence **3/5**,
+CV **2,97%** — o mais estável); Thompson 105.512 (2/5); baseline instável (CV 20,2%).
 
 ### Leitura
 
-- **LinUCB vence** (+66,6% de valor vs baseline; regret de apenas 5,1% do ótimo):
-  usar o **contexto** para personalizar a oferta supera políticas não-contextuais.
-- **Thompson e Nilos-UCB** batem o baseline em ~50% — o valor da **exploração**.
-- **Paradoxo do baseline**: tem a **maior taxa de conversão (10,7%)** mas o **menor
-  reward**. Ele trava na oferta que converte mais (baixa margem) e ignora ofertas
-  de alta margem e o contexto. Confirma que **conversão crua engana** — o KPI certo
-  é **reward/regret ponderado por margem**.
+- **Ganho modesto e honesto** (~+8–9%) na base real — não os ~+60% do fac-símile. O
+  **LinUCB** entrega o **menor regret (8,3%)** e a **maior conversão (9,1%)**, e
+  **lidera na média de seeds** → política recomendada.
+- **Nem todo bandit vence**: o **Nilos-UCB** sobre-explorou (29%) e ficou **abaixo**
+  do baseline (−2,6%). Resultado negativo reportado sem maquiagem.
+- **Baseline**: colapsa ~85% das decisões no Empréstimo (alta margem) e ignora o
+  contexto. Confirma que **conversão crua engana** — o KPI certo é
+  **reward/regret ponderado por margem**.
 
-> Números do *facsimile* (reprodutíveis). Conclusões qualitativas (ordem das
-> políticas, valor de contexto/exploração) se mantêm na base real; magnitudes
-> variam.
+> Números **reais** (`provenance="real"`), reprodutíveis com `adaptive-offers evaluate`.

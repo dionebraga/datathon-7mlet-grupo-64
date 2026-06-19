@@ -18,14 +18,21 @@
 - **Avaliação**: golden set (24 casos), métricas offline, sensibilidade, IPS,
   fairness de exposição (ver `reports/offline-evaluation.md`).
 
-## 3. Métricas (facsimile, 20k rounds)
+## 3. Métricas — base real (UCI Bank Marketing · 41.188 contatos · 6.000 rounds)
 | Métrica | LinUCB | Baseline |
 |---|---:|---:|
-| Reward acumulado | 424.820 | 255.060 |
-| Regret ratio | 5,1% | 42,7% |
-| Lift de valor | **+66,6%** | — |
-| Golden set pass-rate | 100% | 54% |
-| Sensibilidade (CV reward) | 1,9% | — |
+| Reward acumulado | 113.230 | 104.700 |
+| Reward médio (5 seeds) | **110.046** | 87.616 |
+| Regret ratio | **8,3%** | 10,9% |
+| Conversão | **9,1%** | 6,2% |
+| Lift de valor (seed 123) | +8,2% | — |
+| Golden set pass-rate | **83,3%** (adversarial 5/5) | — |
+| Estabilidade (CV reward, 5 seeds) | **2,97%** | 20,2% |
+| Fairness (disparidade de exposição) | **0,00** | — |
+
+> Numa seed isolada o Thompson capturou um pouco mais de valor (+9,2%); **na média
+> de 5 seeds o LinUCB lidera e é o mais estável** — por isso é a política recomendada.
+> O ganho é **modesto e honesto** (single digits), não os ~+60% do fac-símile.
 
 ## 4. Uso pretendido (intended use)
 - Recomendar, **dentro do conjunto elegível**, a oferta de maior valor esperado
