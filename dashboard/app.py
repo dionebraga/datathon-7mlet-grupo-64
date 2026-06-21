@@ -62,7 +62,7 @@ def _md2html(text: str) -> str:
     import re as _re
     # ### Section headers → refined accent header (dot + label + fading divider)
     text = _re.sub(
-        r"^### (.+)$",
+        r"^#{1,4}\s+(.+)$",
         r'<div style="display:flex;align-items:center;gap:9px;margin:18px 0 9px;'
         r'break-inside:avoid;-webkit-column-break-inside:avoid">'
         r'<span style="width:4px;height:13px;border-radius:2px;flex-shrink:0;'
@@ -197,13 +197,8 @@ def logo_svg(size: int = 34, gid: str = "lg") -> str:
 
 
 def _hero_bg_layer() -> str:
-    """CSS background-image layer (base64 data URI) for the hero image.
-
-    Reads the user's image from ``frontend/public/`` and, since the data URI is
-    re-sent on every rerun, downscales large files to keep it light. Returns
-    ``""`` (no layer) if none exists; the image is later dimmed by a translucent
-    black overlay so it reads as a subtle backdrop.
-    """
+    """CSS background-image (data-URI) da FOTO do hero (sem fórmulas — estas vão
+    numa 2ª camada). Downscala arquivos grandes p/ manter o data-URI leve."""
     import base64
     import io
 
@@ -214,7 +209,7 @@ def _hero_bg_layer() -> str:
         if not f.exists():
             continue
         data = f.read_bytes()
-        if len(data) > 600_000:  # heavy asset → re-encode a lighter copy for the embed
+        if len(data) > 600_000:
             try:
                 from PIL import Image
 
@@ -230,10 +225,91 @@ def _hero_bg_layer() -> str:
     return ""
 
 
+def _formula_spiral_uri() -> str:
+    """data-URI de um SVG = fórmulas preenchendo a tela, **mascaradas pela própria
+    foto do hero** (máscara de luminância NATIVA do SVG → universal): as fórmulas
+    aparecem SOMENTE onde o tubo glow é brilhante, seguindo todo o caracol
+    automaticamente — sem traçar caminho. Vai na camada ``::after`` (mesmo cover
+    da foto, então alinha pixel a pixel). ``""`` se não houver imagem."""
+    import base64
+    import io
+
+    public = ROOT / "frontend" / "public"
+    img_b64, mime = "", "image/png"
+    for name, m in (("hero-bg.png", "image/png"), ("hero-bg.jpg", "image/jpeg"),
+                    ("hero-bg.jpeg", "image/jpeg")):
+        f = public / name
+        if not f.exists():
+            continue
+        data, mime = f.read_bytes(), m
+        try:
+            from PIL import Image
+
+            im = Image.open(io.BytesIO(data)).convert("RGB")
+            im.thumbnail((1400, 1400))
+            buf = io.BytesIO()
+            im.save(buf, format="JPEG", quality=80, optimize=True)
+            data, mime = buf.getvalue(), "image/jpeg"
+        except Exception:
+            pass
+        img_b64 = base64.b64encode(data).decode("ascii")
+        break
+    if not img_b64:
+        return ""
+
+    W, H = 1600, 900
+    # Sequência NA ORDEM do loop de treino do bandit contextual (① … ⑦ → repete).
+    line = (
+        "① contexto x  →  ② estima θ̂ₐ=Aₐ⁻¹bₐ  →  "
+        "③ score UCBₐ=xᵀθ̂ₐ+α√(xᵀAₐ⁻¹x)  →  ④ escolhe a*=argmaxₐ UCBₐ  →  "
+        "⑤ observa reward r=margem·P(conv|x)  →  ⑥ atualiza Aₐ←Aₐ+xxᵀ, bₐ←bₐ+r·x  →  "
+        "⑦ regret=Σ(μ*−μₐ)  →  "
+    ) * 5
+    fs, k, yy, rows = 21, 0, 21, []
+    while yy < H + fs:
+        dx = -140 - (k % 4) * 80
+        rows.append(
+            f'<text x="{dx}" y="{yy}" font-weight="600" font-size="{fs}" '
+            f'letter-spacing="0.5" fill="#EAF2FF" '
+            f'font-family="\'Segoe UI\',system-ui,sans-serif">{line}</text>'
+        )
+        yy += int(fs * 1.42)   # linhas mais juntas → preenche os vãos escuros
+        k += 1
+    img_href = f"data:{mime};base64,{img_b64}"
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'xmlns:xlink="http://www.w3.org/1999/xlink" '
+        f'width="{W}" height="{H}" viewBox="0 0 {W} {H}">'
+        f'<defs>'
+        # Máscara sólida do tubo: (1) blur leve preenche os miolos escuros do tubo
+        # com os vizinhos brilhantes; (2) grayscale; (3) table que ZERA o halo fraco
+        # (sem vazar fora) e ENCHE o corpo do tubo (sem gaps pretos).
+        f'<filter id="mb">'
+        f'<feGaussianBlur stdDeviation="3.5"/>'
+        f'<feColorMatrix type="saturate" values="0"/>'
+        f'<feComponentTransfer>'
+        f'<feFuncR type="table" tableValues="0 0.25 0.81 0.96 1 1 1 1 1 1 1"/>'
+        f'<feFuncG type="table" tableValues="0 0.25 0.81 0.96 1 1 1 1 1 1 1"/>'
+        f'<feFuncB type="table" tableValues="0 0.25 0.81 0.96 1 1 1 1 1 1 1"/>'
+        f'</feComponentTransfer></filter>'
+        f'<mask id="tube" maskUnits="userSpaceOnUse" x="0" y="0" '
+        f'width="{W}" height="{H}">'
+        f'<image xlink:href="{img_href}" href="{img_href}" x="0" y="0" '
+        f'width="{W}" height="{H}" preserveAspectRatio="xMidYMid slice" '
+        f'filter="url(#mb)"/>'
+        f'</mask></defs>'
+        f'<g mask="url(#tube)">{"".join(rows)}</g></svg>'
+    )
+    svg_b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f'url("data:image/svg+xml;base64,{svg_b64}")'
+
+
 HERO_BG = _hero_bg_layer()
 # Só a parte url("data:…") — usada na camada animada de fundo (sem `fixed`, que
 # entra em conflito com transform). Vazio se não houver imagem de hero.
 HERO_URL = HERO_BG.split(" center/cover")[0] if HERO_BG else ""
+# Camada 2 (::after): fórmulas dos algoritmos numa espiral, sobre a foto.
+FORMULA_URL = _formula_spiral_uri()
 
 st.markdown(
     f"""
@@ -253,22 +329,45 @@ st.markdown(
         display: flex !important; pointer-events: all !important; z-index: 999999 !important;}}
       [data-testid="stSidebarCollapseButton"] {{display: none !important;}}
       html, body, [class*="css"], .stApp {{font-family:'Inter',system-ui,sans-serif;}}
-      .stApp {{background:{BG};}}
-      /* ── Fundo animado (imagem que deriva e borra lentamente) ───── */
+      /* base preta na raiz; .stApp transparente p/ a imagem do ::before aparecer */
+      html, body {{background:{BG};}}
+      .stApp {{background:transparent;}}
+      /* ── Imagem de fundo: CRESCE do centro (máscara radial expande) até
+            preencher; depois deriva de leve. Sem leque, sem sujeira. ────── */
       .stApp::before {{
-        content:""; position:fixed; inset:-6%; z-index:-1; pointer-events:none;
+        content:""; position:fixed; inset:-6%; z-index:0; pointer-events:none;
         background:{HERO_URL} center/cover no-repeat;
-        opacity:.40; will-change:transform,filter;
-        animation:heroDrift 32s ease-in-out infinite alternate;}}
-      @keyframes heroDrift {{
-        0%   {{transform:scale(1.06) translate3d(0,0,0);
-               filter:blur(0px) saturate(1.05) brightness(1.00);}}
-        50%  {{transform:scale(1.15) translate3d(-1.8%,1.3%,0);
-               filter:blur(3px) saturate(1.28) brightness(1.10);}}
-        100% {{transform:scale(1.10) translate3d(1.8%,-1.3%,0);
-               filter:blur(1px) saturate(1.12) brightness(1.03);}}}}
+        opacity:0; will-change:transform,opacity,-webkit-mask-size;
+        -webkit-mask:radial-gradient(circle at 50% 47%,
+            #000 42%, rgba(0,0,0,.5) 66%, transparent 84%) 50% 47% / 0% 0% no-repeat;
+        mask:radial-gradient(circle at 50% 47%,
+            #000 42%, rgba(0,0,0,.5) 66%, transparent 84%) 50% 47% / 0% 0% no-repeat;
+        animation:heroGrow 2.8s cubic-bezier(.2,.7,.2,1) both;}}
+      /* ── Camada 2: FÓRMULAS — preenchem a tela mas são MASCARADAS pela própria
+            foto (luminância): aparecem só onde o tubo glow é brilhante = seguem o
+            caracol automaticamente, sem traçar. Mesma escala/cover da foto. ──── */
+      .stApp::after {{
+        content:""; position:fixed; inset:-6%; z-index:0; pointer-events:none;
+        background:{FORMULA_URL} center/cover no-repeat;
+        opacity:0; transform:scale(1.05); will-change:opacity,transform;
+        mix-blend-mode:screen;
+        animation:formReveal 2.6s ease-out 0.5s both;}}
+      /* conteúdo sempre ACIMA das camadas de fundo */
+      [data-testid="stMain"], [data-testid="stSidebar"],
+      [data-testid="stHeader"] {{position:relative; z-index:1;}}
+      @keyframes heroGrow {{
+        0%   {{opacity:0;   transform:scale(1.02);
+               -webkit-mask-size:0% 0%; mask-size:0% 0%;}}
+        60%  {{opacity:.26;}}
+        100% {{opacity:.26; transform:scale(1.05);
+               -webkit-mask-size:340% 340%; mask-size:340% 340%;}}}}
+      @keyframes formReveal {{
+        0%   {{opacity:0;}}
+        100% {{opacity:.55;}}}}
       @media (prefers-reduced-motion: reduce) {{
-        .stApp::before {{animation:none;}}}}
+        .stApp::before {{animation:none; opacity:.26;
+          filter:none; -webkit-mask:none; mask:none;}}
+        .stApp::after {{animation:none; opacity:.55;}}}}
       /* ── Layout base ─────────────────────────────────────────── */
       .block-container {{padding-top:1rem;padding-bottom:0.5rem;max-width:1400px;}}
       [data-testid="stSidebar"] {{background:{PANEL2};border-right:1px solid rgba(255,255,255,.05);}}
@@ -319,10 +418,18 @@ st.markdown(
         border:1px solid rgba(255,255,255,.07) !important;
         border-radius:12px !important; overflow:hidden;
         box-shadow:0 1px 3px rgba(0,0,0,.50), 0 4px 14px rgba(0,0,0,.35);}}
+      [data-testid="stExpander"] details,
+      [data-testid="stExpander"] details > summary,
+      [data-testid="stExpanderHeader"],
+      [data-testid="stExpanderDetails"] {{
+        background:transparent !important; border:none !important;}}
       [data-testid="stExpander"] summary {{
         font-weight:700 !important; color:{TEXT} !important; font-size:.86rem;
-        padding:12px 14px !important;}}
-      [data-testid="stExpander"] summary:hover {{color:{CYAN} !important;}}
+        padding:12px 14px !important; background:transparent !important;}}
+      [data-testid="stExpander"] summary p,
+      [data-testid="stExpander"] summary span {{color:{TEXT} !important;}}
+      [data-testid="stExpander"] summary:hover,
+      [data-testid="stExpander"] summary:hover p {{color:{CYAN} !important;}}
       [data-testid="stExpander"] summary svg {{fill:{CYAN} !important;}}
       [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{padding:4px 14px 14px;}}
       /* ── st.metric — tiles escuros (usado no rastreio) ────────── */
@@ -514,7 +621,7 @@ st.markdown(
 # --------------------------------------------------------------------------- #
 # Experiment (cached)
 # --------------------------------------------------------------------------- #
-@st.cache_resource(show_spinner="Treinando políticas e simulando o experimento…")
+@st.cache_resource(show_spinner="🛰️ Preparando o experimento (treino das 5 políticas) — só nesta primeira carga, fica em cache depois…")
 def load_experiment(horizon: int, seed: int):
     proc_path = ROOT / "data" / "processed" / "bank_marketing_processed.parquet"
     needs_build = not proc_path.exists()
@@ -913,6 +1020,10 @@ best = summary[0]
 best_res = results[best["policy"]]
 base_res = results["baseline"]
 qrep = quality_report(processed)
+
+# NOTA: overlay de fórmulas seguindo a curva da imagem foi REMOVIDO — o Streamlit
+# sanitiza <text>/<textPath> no st.markdown, então o SVG não renderizava (virava
+# texto solto no topo). As fórmulas e código vivem na seção "📐 Fórmulas & código".
 
 # ── Legenda profissional de políticas (sidebar, com métricas) ──────────────
 with st.sidebar:
@@ -1539,6 +1650,44 @@ a4.plotly_chart(gauge(
 ), config=NO_BAR, **fill())
 
 # --- Grid row B: experiment results ---------------------------------------- #
+def p_timeseries(series_fn, title, *, smooth=False, pct=False, money=False,
+                 height=None, legend_left=True) -> go.Figure:
+    """Linha temporal por round — uma série por política, destacando a ativa.
+
+    ``series_fn(res)`` extrai o array por round; ``smooth`` aplica média móvel
+    (≈4% do horizonte) para revelar tendência sob o ruído."""
+    fig = go.Figure()
+    yfmt = ":.1%" if pct else (":,.0f" if money else ":,.2f")
+    pre = "R$ " if money else ""
+    for name, res in results.items():
+        y = np.asarray(series_fn(res), dtype=float)
+        if smooth and len(y) > 4:
+            w = max(1, len(y) // 25)
+            y = pd.Series(y).rolling(w, min_periods=1).mean().to_numpy()
+        n = len(y)
+        if n == 0:
+            continue
+        pts = min(110, n)
+        idx = np.linspace(0, n - 1, pts).astype(int)
+        col = POLICY_COLORS.get(name, VIOLET)
+        is_best = name == best["policy"]
+        fig.add_trace(go.Scatter(
+            x=(idx + 1), y=y[idx], mode="lines",
+            name=POLICY_LABEL.get(name, name), legendgroup=name,
+            line=dict(color=col, width=3 if is_best else 1.6,
+                      shape="spline", smoothing=0.6,
+                      dash="solid" if is_best else "dot"),
+            opacity=1.0 if is_best else 0.62,
+            hovertemplate=f"<b>{pre}%{{y{yfmt}}}</b><extra>{POLICY_LABEL.get(name, name)}</extra>",
+        ))
+    fig.update_xaxes(title_text="rounds →", title_font=dict(size=9, color=MUTED))
+    if pct:
+        fig.update_yaxes(tickformat=".0%")
+    lx, lxa = (0.02, "left") if legend_left else (0.98, "right")
+    return style_panel(fig, title, height=height or (GRID_H + 36),
+                       legend_x=lx, legend_xanchor=lxa, hovermode="x unified")
+
+
 st.markdown('<div class="sect">📊 Resultados do experimento</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="sect-desc">Comparação das 5 políticas no mesmo cenário/seed. '
@@ -1558,6 +1707,25 @@ b3.plotly_chart(p_arms_bar(pulls_named.index, pulls_named.values, "🎯 Pulls po
                 config=NO_BAR, **fill())
 b4.plotly_chart(p_lollipop("conversion_rate", "📊 Conversão por política"), config=NO_BAR, **fill())
 
+# Segunda linha — trajetórias temporais (mais explicativas que os rankings acima)
+b5, b6 = st.columns(2)
+b5.plotly_chart(
+    p_timeseries(lambda r: r.cumulative_reward,
+                 "💹 Reward acumulado ao longo dos rounds", money=True),
+    config=NO_BAR, **fill())
+b6.plotly_chart(
+    p_timeseries(lambda r: r.converted, "🎯 Taxa de conversão (janela móvel)",
+                 smooth=True, pct=True),
+    config=NO_BAR, **fill())
+st.markdown(
+    '<div class="sect-desc" style="margin-top:6px">'
+    '<b>Reward acumulado</b>: a política ativa (linha cheia) se descola das demais à medida '
+    'que aprende — a inclinação é a taxa de ganho. '
+    '<b>Taxa de conversão</b> (janela móvel, %): fração de rodadas que converteram em cada '
+    'janela — sobe e converge conforme o bandit refina a seleção (forma distinta do cumulativo).</div>',
+    unsafe_allow_html=True,
+)
+
 # --- Grid row C: ML learning dynamics -------------------------------------- #
 st.markdown('<div class="sect">🧠 Dinâmica de aprendizado do modelo</div>', unsafe_allow_html=True)
 st.markdown(
@@ -1574,6 +1742,91 @@ c2.plotly_chart(p_window_regret("⚡ Regret por janela (convergência)"), config
 c3.plotly_chart(p_lollipop("exploration_rate", "🔍 Taxa de exploração",
                             ref_zone=(0.10, 0.20), ref_label="zona ideal"), config=NO_BAR, **fill())
 c4.plotly_chart(p_policy_heatmap("🔢 Comparação multi-métrica"), config=NO_BAR, **fill())
+
+# Segunda linha — dinâmica temporal do aprendizado (exploração e convergência)
+c5, c6 = st.columns(2)
+c5.plotly_chart(
+    p_timeseries(lambda r: r.explored,
+                 "🔭 Exploração → explotação ao longo do tempo", smooth=True, pct=True),
+    config=NO_BAR, **fill())
+c6.plotly_chart(
+    p_timeseries(lambda r: r.instant_regret,
+                 "📉 Regret instantâneo (suavizado) — convergência", smooth=True, money=True),
+    config=NO_BAR, **fill())
+st.markdown(
+    '<div class="sect-desc" style="margin-top:6px">'
+    '<b>Exploração ao longo do tempo</b>: fração de rodadas testando braços alternativos '
+    '(média móvel). Cai conforme o modelo ganha confiança — a transição '
+    'exploração→explotação que define o aprendizado por bandit (baseline fica em 0%). '
+    '<b>Regret instantâneo</b>: perda por decisão vs oráculo, suavizada — '
+    'a queda em direção a zero é a <i>prova visual da convergência</i>.</div>',
+    unsafe_allow_html=True,
+)
+
+# --- Monte Carlo & tendência ------------------------------------------------ #
+def p_montecarlo(title: str, n_paths: int = 240) -> go.Figure:
+    """Monte Carlo: reamostra (bootstrap) os rewards por round da política ativa
+    em N trajetórias → leque de incerteza (P5–P95, P25–P75) do reward acumulado."""
+    rng = np.random.default_rng(7)
+    base = np.asarray(best_res.realized_reward, dtype=float)
+    n = len(base)
+    paths = np.cumsum(base[rng.integers(0, n, size=(n_paths, n))], axis=1)
+    q5, q25, q50, q75, q95 = np.percentile(paths, [5, 25, 50, 75, 95], axis=0)
+    x = np.arange(1, n + 1)
+    sel = np.linspace(0, n - 1, min(120, n)).astype(int)
+    fig = go.Figure()
+    band = [(q95, q5, hex_rgba(CYAN, .10), "P5–P95"),
+            (q75, q25, hex_rgba(CYAN, .20), "P25–P75")]
+    for hi, lo, fc, nm in band:
+        fig.add_trace(go.Scatter(x=x[sel], y=hi[sel], mode="lines",
+                                 line=dict(width=0), showlegend=False, hoverinfo="skip"))
+        fig.add_trace(go.Scatter(x=x[sel], y=lo[sel], mode="lines", line=dict(width=0),
+                                 fill="tonexty", fillcolor=fc, name=nm, hoverinfo="skip"))
+    fig.add_trace(go.Scatter(
+        x=x[sel], y=q50[sel], mode="lines", name="mediana",
+        line=dict(color=CYAN, width=2.6, shape="spline", smoothing=0.5),
+        hovertemplate="round %{x}<br>mediana R$ %{y:,.0f}<extra></extra>"))
+    fig.update_xaxes(title_text="rounds →", title_font=dict(size=9, color=MUTED))
+    return style_panel(fig, title, height=GRID_H + 40, legend_x=0.02, legend_xanchor="left")
+
+
+def p_trend(title: str) -> go.Figure:
+    """Tendência: reward médio por janela (barras) + reta de regressão (OLS)."""
+    base = np.asarray(best_res.realized_reward, dtype=float)
+    n = len(base)
+    w = max(1, n // 22)
+    nb = n // w
+    wm = base[:nb * w].reshape(nb, w).mean(axis=1)
+    xw = np.arange(nb) * w + w / 2
+    coef = np.polyfit(xw, wm, 1)
+    trend = np.polyval(coef, xw)
+    up = coef[0] >= 0
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=xw, y=wm, name="reward/round (janela)",
+                         marker=dict(color=hex_rgba(GOLD, .55), line=dict(width=0)),
+                         hovertemplate="round ~%{x:.0f}<br>R$ %{y:,.1f}<extra></extra>"))
+    fig.add_trace(go.Scatter(
+        x=xw, y=trend, mode="lines", name=f"tendência {'↗' if up else '↘'}",
+        line=dict(color=GREEN if up else RED, width=3, dash="dash"),
+        hovertemplate="tendência R$ %{y:,.1f}<extra></extra>"))
+    fig.update_xaxes(title_text="rounds →", title_font=dict(size=9, color=MUTED))
+    return style_panel(fig, title, height=GRID_H + 40, legend_x=0.02, legend_xanchor="left")
+
+
+st.markdown('<div class="sect">🎲 Monte Carlo & tendência</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="sect-desc">'
+    '<b>Monte Carlo</b>: 240 trajetórias por bootstrap dos rewards da política ativa — '
+    'o leque mostra a incerteza do reward acumulado (P5–P95 e P25–P75) em torno da mediana. '
+    '<b>Tendência</b>: reward médio por janela com reta de regressão (OLS) — '
+    'inclinação positiva indica que a política continua melhorando ao longo dos rounds.</div>',
+    unsafe_allow_html=True,
+)
+mc1, mc2 = st.columns(2)
+mc1.plotly_chart(p_montecarlo("🎲 Monte Carlo — leque de reward acumulado"),
+                 config=NO_BAR, **fill())
+mc2.plotly_chart(p_trend("📈 Tendência do reward por janela (OLS)"),
+                 config=NO_BAR, **fill())
 
 # --- Grid row C2: Stopping criterion --------------------------------------- #
 st.markdown('<div class="sect">🛑 Critério de parada do experimento</div>', unsafe_allow_html=True)
@@ -1670,6 +1923,61 @@ with stop_stat:
             'Aumente o horizonte de simulação.</div>',
             unsafe_allow_html=True,
         )
+
+# --- Fórmulas & código dos algoritmos (apêndice técnico, igual aos slides) -- #
+st.markdown('<div class="sect">📐 Fórmulas & código dos algoritmos</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="sect-desc">As fórmulas e o código real usados no treino de cada política '
+    'bandit — o mesmo conteúdo do apêndice técnico do pitch.</div>',
+    unsafe_allow_html=True,
+)
+with st.expander("Ver fórmulas e código por algoritmo", expanded=False):
+    _ta, _tb, _tc, _tdd = st.tabs(
+        ["LinUCB ★", "Thompson (Beta)", "LinThompson", "Nilos-UCB · Baseline"])
+    with _ta:
+        st.latex(r"\hat\theta_a = A_a^{-1} b_a \qquad "
+                 r"p_a = x^\top \hat\theta_a + \alpha\sqrt{x^\top A_a^{-1} x}")
+        st.caption("Regressão ridge por braço; o termo α·√(·) adiciona exploração "
+                   "otimista (intervalo de confiança superior).")
+        st.code(
+            "A_a += x @ x.T              # covariância do braço\n"
+            "b_a += reward * x           # recompensa acumulada\n"
+            "theta = inv(A_a) @ b_a      # estimativa ridge\n"
+            "ucb   = x @ theta + alpha * sqrt(x @ inv(A_a) @ x)\n"
+            "arm   = argmax_a(ucb)       # braço escolhido",
+            language="python")
+    with _tb:
+        st.latex(r"\theta_a \sim \mathrm{Beta}(\alpha_a,\beta_a) \qquad "
+                 r"a^{*} = \arg\max_a \theta_a")
+        st.caption("Bayesiano Beta-Bernoulli: amostra uma taxa por braço; "
+                   "sucesso incrementa α, falha incrementa β.")
+        st.code(
+            "theta = rng.beta(alpha, beta)   # amostra por braço\n"
+            "arm   = argmax(theta)\n"
+            "alpha[arm] += reward            # update conjugado\n"
+            "beta[arm]  += (1 - reward)",
+            language="python")
+    with _tc:
+        st.latex(r"\theta \sim \mathcal{N}(\hat\theta,\,A^{-1}) \qquad "
+                 r"a^{*} = \arg\max_a x^\top \theta_a")
+        st.caption("Thompson linear: amostra um vetor de pesos da posterior "
+                   "gaussiana e escolhe o braço de maior valor esperado.")
+        st.code(
+            "theta = rng.multivariate_normal(inv(A) @ b, inv(A))\n"
+            "arm   = argmax_a(x @ theta_a)",
+            language="python")
+    with _tdd:
+        st.latex(r"\text{Nilos-UCB:}\; p_a = \hat\mu_a + "
+                 r"\sqrt{\tfrac{2\ln t}{n_a}}\,\hat\sigma_a \qquad "
+                 r"\text{Baseline:}\; a^{*} = \arg\max_a \hat\mu_a")
+        st.caption("Nilos-UCB pondera a incerteza pela variância observada; "
+                   "o baseline é greedy puro (sem exploração) — controle do experimento.")
+        st.code(
+            "# Nilos-UCB (variance-aware)\n"
+            "bonus = sqrt(2 * log(t) / n_a) * sigma_a\n"
+            "arm   = argmax_a(mu_a + bonus)\n"
+            "# Baseline greedy:  arm = argmax_a(mu_a)",
+            language="python")
 
 # --- Grid row D: dataset signals ------------------------------------------- #
 st.markdown('<div class="sect">🧬 Análise exploratória da base</div>', unsafe_allow_html=True)
@@ -1895,6 +2203,23 @@ loan = col[2].selectbox("Tem empréstimo?", ["no", "yes", "unknown"])
 prev = 1 if poutcome != "nonexistent" else 0
 
 if st.button("🚀 Decidir oferta", type="primary", **fill()):
+    # Faz o fundo CRESCER de novo como feedback da decisão: @keyframes de nome
+    # único por decisão → reinicia a animação (CSS não re-dispara sozinho em rerun).
+    # String flush-left (sem indentação) p/ não virar bloco de código no Streamlit.
+    _dn = st.session_state.get("_decide_n", 0) + 1
+    st.session_state["_decide_n"] = _dn
+    st.markdown(
+        "<style>"
+        f"@keyframes heroRegrow{_dn}{{"
+        "0%{opacity:0;-webkit-mask-size:0% 0%;mask-size:0% 0%;transform:scale(1.02);}"
+        "60%{opacity:.26;}"
+        "100%{opacity:.26;-webkit-mask-size:340% 340%;mask-size:340% 340%;transform:scale(1.05);}}"
+        ".stApp::before{"
+        f"animation:heroRegrow{_dn} 2.4s cubic-bezier(.2,.7,.2,1) both,"
+        "heroDrift 44s ease-in-out 2.4s infinite alternate !important;}"
+        "</style>",
+        unsafe_allow_html=True,
+    )
     with st.spinner("Decidindo…"):
         from adaptive_offers.assistant import Assistant
         from adaptive_offers.bootstrap import ensure_service
