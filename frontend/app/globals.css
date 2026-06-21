@@ -1,19 +1,19 @@
 @import "tailwindcss";
 
-/* Design tokens — Vercel-style dark (pure black + electric blue). */
+/* Design tokens — Adaptive Offers brand palette (alinhada ao dashboard/API). */
 @theme {
   --color-bg: #000000;
-  --color-surface: #0a0a0a;
-  --color-surface2: #111111;
+  --color-surface: #030d24;
+  --color-surface2: #010a1a;
   --color-border: rgba(255, 255, 255, 0.07);
-  --color-primary: #0070f3;
-  --color-primary-soft: #3291ff;
+  --color-primary: #1a6fff;
+  --color-primary-soft: #4d8bff;
   --color-accent: #0a1628;
-  --color-success: #34d399;
-  --color-warning: #f5a623;
-  --color-danger: #ef4444;
+  --color-success: #1a9e1a;
+  --color-warning: #ffc200;
+  --color-danger: #e84000;
   --color-text: #ededed;
-  --color-muted: #a1a1aa;
+  --color-muted: #8899bb;
 
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --radius-card: 0.9rem;

@@ -1,7 +1,7 @@
 # Dark observability theme for the Adaptive Offers BI dashboard.
 [theme]
 base = "dark"
-primaryColor = "#0070F3"
+primaryColor = "#1A6FFF"
 backgroundColor = "#000000"
 secondaryBackgroundColor = "#0A0A0A"
 textColor = "#EDEDED"

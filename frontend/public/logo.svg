@@ -1,0 +1,22 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="aoGrad" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0033CC"/>
+      <stop offset="1" stop-color="#1A6FFF"/>
+    </linearGradient>
+    <filter id="aoGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="2" y="2" width="44" height="44" rx="13" fill="#030D24" stroke="url(#aoGrad)" stroke-width="2"/>
+  <!-- ascending arms (multi-armed bandit) -->
+  <rect x="11.5" y="28" width="5.2" height="9"  rx="2" fill="#1A6FFF" opacity="0.50"/>
+  <rect x="20.4" y="22" width="5.2" height="15" rx="2" fill="#1A6FFF" opacity="0.78"/>
+  <rect x="29.3" y="15" width="5.2" height="22" rx="2" fill="url(#aoGrad)"/>
+  <!-- learning trend -->
+  <path d="M11 30.5 L23 24 L32 12.5" stroke="#FFFFFF" stroke-width="1.7"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.9" fill="none"/>
+  <!-- chosen arm (gold) -->
+  <circle cx="32" cy="12.5" r="3.7" fill="#FFC200" stroke="#FFFFFF" stroke-width="1.3" filter="url(#aoGlow)"/>
+</svg>

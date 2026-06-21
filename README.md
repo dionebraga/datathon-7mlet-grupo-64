@@ -166,7 +166,7 @@ docker compose up --build
 |---|---|---|
 | 🌐 **API + Swagger** (docs interativa) | `adaptive-offers serve` | http://localhost:8000/docs |
 | 📊 **Dashboard BI** (comparação, regret, decisão) | `streamlit run dashboard\app.py` | http://localhost:8501 |
-| 📈 **MLflow** (experimentos) | `mlflow ui` | http://localhost:5000 |
+| 📈 **MLflow** (experimentos) | `$env:MLFLOW_ALLOW_FILE_STORE='true'; mlflow ui --backend-store-uri file:./mlruns --port 5000` | http://localhost:5000 |
 | 🧾 **Log auditável de decisões** | `Get-Content artifacts\decisions\audit.jsonl -Tail 5` | terminal |
 | 📓 **Notebook de EDA** | `jupyter lab notebooks\01_eda.ipynb` | navegador |
 
@@ -182,18 +182,44 @@ Invoke-RestMethod -Uri "http://localhost:8000/assistant/explain?question=Por que
   -Method Post -Body $body -ContentType "application/json"
 ```
 
+### 5.1 🤖 Assistente LLM — ativar Claude (Anthropic) ou Azure OpenAI
+
+O assistente funciona em **três modos**, selecionados pela variável `LLM_PROVIDER`
+no arquivo `.env` (na raiz do projeto). Sem chave, ele cai automaticamente no modo
+**offline** (resumo determinístico, ainda *grounded* nos chunks RAG) — por isso o
+badge mostra **⚡ análise ML**.
+
+| `LLM_PROVIDER` | Requisito | Badge no dashboard |
+|---|---|---|
+| `offline` (padrão) | nenhum | ⚡ análise ML |
+| `anthropic` | `ANTHROPIC_API_KEY` | ● Claude online |
+| `azure_openai` | `AZURE_OPENAI_*` | ● Claude online |
+
+**Ativar o Claude (Anthropic):** edite o `.env` e reinicie API + dashboard:
+
+```dotenv
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-api03-...        # console.anthropic.com/settings/keys
+ANTHROPIC_MODEL=claude-opus-4-8           # qualidade máxima (ou claude-haiku-4-5 p/ custo)
+```
+
+> ⚠️ O `.env` está no `.gitignore` — **nunca** faça commit da chave. Se ela vazar,
+> revogue em *console.anthropic.com → API keys* e gere outra.
+> A chave é lida **só na inicialização**: depois de editar o `.env`, **reinicie**
+> o `streamlit run` (e o `adaptive-offers serve`) para o badge virar **● Claude online**.
+
 ## 6. 🧪 Comandos (pipeline ponta a ponta)
 
 | Comando | Stage | O que entrega |
 |---|:---:|---|
 | `adaptive-offers data build` | 1 | Base processada, registro de fonte/versão/licença, decisão de vazamento |
 | `adaptive-offers synth generate` | 2 | `offer_catalog`, `offer_events`, `delayed_rewards` + schema |
-| `adaptive-offers train` | 3 | Baseline + Thompson + Nilos-UCB + LinUCB, métricas em MLflow |
-| `adaptive-offers evaluate` | 4 | Métricas reproduzíveis, golden set, fairness de exposição |
+| `adaptive-offers train --horizon 20000 --seed 42` | 3 | Baseline + Thompson + Nilos-UCB + LinUCB, métricas em MLflow |
+| `adaptive-offers evaluate --horizon 20000 --seed 42` | 4 | Métricas reproduzíveis, golden set, fairness de exposição |
 | `adaptive-offers decide` | 5 | Decisão com braço, reason codes, versão da política, log auditável |
 | `adaptive-offers serve` | 5 | API com contrato documentado e tratamento de erro |
 | `adaptive-offers monitor` | 7 | Relatório HTML de drift/fairness (EvidentlyAI opcional) |
-| `adaptive-offers pipeline` | 1–4 | **Tudo em um comando** |
+| `adaptive-offers pipeline --rows 20000` | 1–4 | **Tudo em um comando** (28s) |
 | `pytest` | — | 57 testes (unit + integração) |
 
 ## 7. 📚 Documentação
@@ -244,13 +270,13 @@ Invoke-RestMethod -Uri "http://localhost:8000/assistant/explain?question=Por que
 
 | Política | Reward acumulado | Regret ratio | Lift vs baseline | Golden set |
 |---|---:|---:|---:|:---:|
-| 🥇 **LinUCB** (contextual) | **424.820** | **5,1%** | **+66,6%** | **100%** |
-| 🥈 Thompson Sampling | 389.180 | 12,2% | +52,6% | — |
-| 🥉 Nilos-UCB (UCB-V) | 383.010 | 14,1% | +50,2% | — |
-| Baseline (controle) | 255.060 | 42,7% | — | 54% |
+| 🥇 **LinUCB** (contextual) | **393.550** | **4,6%** | **+8,3%** | **95,8%** |
+| 🥈 Thompson Sampling | 363.570 | 10,3% | +0,1% | — |
+| 🥉 Nilos-UCB (UCB-V) | 358.810 | 12,3% | −1,2% | — |
+| Baseline (controle) | 363.240 | 9,9% | — | — |
 
 - ✅ **57 testes** passando · **ruff** limpo · pipeline ponta-a-ponta em **1 comando**.
-- 🔍 **IPS off-policy** concorda com a simulação on-policy (~21/impressão).
+- 🔍 **Golden set** avalia 24 cenários (typical, segment, edge, adversarial) com **95,8% de aprovação** — LinUCB é o melhor estimador em todos os estratos.
 - ⚖️ **Fairness** de exposição: disparidade **0,00** entre segmentos.
 
 ---
