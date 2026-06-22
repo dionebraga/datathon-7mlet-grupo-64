@@ -197,8 +197,11 @@ def logo_svg(size: int = 34, gid: str = "lg") -> str:
 
 
 def _hero_bg_layer() -> str:
-    """CSS background-image (data-URI) da FOTO do hero (sem fórmulas — estas vão
-    numa 2ª camada). Downscala arquivos grandes p/ manter o data-URI leve."""
+    """Fundo (data-URI) = a FOTO do hero COM as fórmulas (na ordem do treino)
+    ASSADAS dentro do tubo glow (caracol), usando a luminância da própria foto como
+    máscara — assim ficam só sobre o tubo, sem vazar. O PIL renderiza e compõe
+    (controle exato de pixel). Em caso de falha, cai para a foto pura.
+    """
     import base64
     import io
 
@@ -208,108 +211,62 @@ def _hero_bg_layer() -> str:
         f = public / name
         if not f.exists():
             continue
-        data = f.read_bytes()
-        if len(data) > 600_000:
-            try:
-                from PIL import Image
-
-                im = Image.open(io.BytesIO(data)).convert("RGB")
-                im.thumbnail((1920, 1920))
-                buf = io.BytesIO()
-                im.save(buf, format="JPEG", quality=82, optimize=True)
-                data, mime = buf.getvalue(), "image/jpeg"
-            except Exception:
-                pass
-        b64 = base64.b64encode(data).decode("ascii")
-        return f'url("data:{mime};base64,{b64}") center/cover fixed no-repeat, '
-    return ""
-
-
-def _formula_spiral_uri() -> str:
-    """data-URI de um SVG = fórmulas preenchendo a tela, **mascaradas pela própria
-    foto do hero** (máscara de luminância NATIVA do SVG → universal): as fórmulas
-    aparecem SOMENTE onde o tubo glow é brilhante, seguindo todo o caracol
-    automaticamente — sem traçar caminho. Vai na camada ``::after`` (mesmo cover
-    da foto, então alinha pixel a pixel). ``""`` se não houver imagem."""
-    import base64
-    import io
-
-    public = ROOT / "frontend" / "public"
-    img_b64, mime = "", "image/png"
-    for name, m in (("hero-bg.png", "image/png"), ("hero-bg.jpg", "image/jpeg"),
-                    ("hero-bg.jpeg", "image/jpeg")):
-        f = public / name
-        if not f.exists():
-            continue
-        data, mime = f.read_bytes(), m
         try:
-            from PIL import Image
+            import numpy as _np
+            from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-            im = Image.open(io.BytesIO(data)).convert("RGB")
-            im.thumbnail((1400, 1400))
+            photo = Image.open(f).convert("RGB")
+            photo.thumbnail((1600, 1600))
+            IW, IH = photo.size
+            fs = max(15, int(IH * 0.033))
+            font = None
+            for fp_ in ("C:/Windows/Fonts/seguisym.ttf", "C:/Windows/Fonts/segoeui.ttf"):
+                try:
+                    font = ImageFont.truetype(fp_, fs)
+                    break
+                except Exception:
+                    pass
+            if font is None:
+                font = ImageFont.load_default()
+            # Sequência NA ORDEM do loop de treino do bandit contextual.
+            line = (
+                "(1) contexto x → (2) θ=inv(A)·b → (3) UCB=x^T·θ+α·√(x^T·inv(A)·x) → "
+                "(4) a*=argmax UCB → (5) reward=margem·P(conv|x) → (6) A+=x·x^T ; b+=r·x → "
+                "(7) regret=Σ(μ*−μ) → "
+            ) * 2
+            txt = Image.new("L", (IW, IH), 0)
+            dd = ImageDraw.Draw(txt)
+            y, k = 0, 0
+            while y < IH:
+                dd.text((-180 - (k % 4) * 65, y), line, fill=255, font=font)
+                y += int(fs * 1.32)
+                k += 1
+            # máscara do tubo: blur leve (preenche miolos) + curva que ZERA o halo
+            # fraco (sem vazar) e ENCHE o corpo do tubo (sem gaps).
+            g = photo.convert("L").filter(ImageFilter.GaussianBlur(2))
+            M = _np.interp(_np.asarray(g, dtype=_np.float32) / 255.0,
+                           [0, 0.11, 0.19, 0.36, 1.0],
+                           [0, 0, 0.85, 1.0, 1.0]).astype(_np.float32)
+            P = _np.asarray(photo, dtype=_np.float32)
+            T = _np.asarray(txt, dtype=_np.float32) / 255.0
+            a = (T * M).clip(0, 1)[..., None]
+            top = _np.array([235., 245., 255.], dtype=_np.float32)
+            out = (255 - (255 - P) * (255 - top * a) / 255).clip(0, 255).astype("uint8")  # screen
             buf = io.BytesIO()
-            im.save(buf, format="JPEG", quality=80, optimize=True)
-            data, mime = buf.getvalue(), "image/jpeg"
+            Image.fromarray(out).save(buf, format="JPEG", quality=84, optimize=True)
+            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            return f'url("data:image/jpeg;base64,{b64}") center/cover fixed no-repeat, '
         except Exception:
-            pass
-        img_b64 = base64.b64encode(data).decode("ascii")
-        break
-    if not img_b64:
-        return ""
-
-    W, H = 1600, 900
-    # Sequência NA ORDEM do loop de treino do bandit contextual (① … ⑦ → repete).
-    line = (
-        "① contexto x  →  ② estima θ̂ₐ=Aₐ⁻¹bₐ  →  "
-        "③ score UCBₐ=xᵀθ̂ₐ+α√(xᵀAₐ⁻¹x)  →  ④ escolhe a*=argmaxₐ UCBₐ  →  "
-        "⑤ observa reward r=margem·P(conv|x)  →  ⑥ atualiza Aₐ←Aₐ+xxᵀ, bₐ←bₐ+r·x  →  "
-        "⑦ regret=Σ(μ*−μₐ)  →  "
-    ) * 5
-    fs, k, yy, rows = 21, 0, 21, []
-    while yy < H + fs:
-        dx = -140 - (k % 4) * 80
-        rows.append(
-            f'<text x="{dx}" y="{yy}" font-weight="600" font-size="{fs}" '
-            f'letter-spacing="0.5" fill="#EAF2FF" '
-            f'font-family="\'Segoe UI\',system-ui,sans-serif">{line}</text>'
-        )
-        yy += int(fs * 1.42)   # linhas mais juntas → preenche os vãos escuros
-        k += 1
-    img_href = f"data:{mime};base64,{img_b64}"
-    svg = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" '
-        f'xmlns:xlink="http://www.w3.org/1999/xlink" '
-        f'width="{W}" height="{H}" viewBox="0 0 {W} {H}">'
-        f'<defs>'
-        # Máscara sólida do tubo: (1) blur leve preenche os miolos escuros do tubo
-        # com os vizinhos brilhantes; (2) grayscale; (3) table que ZERA o halo fraco
-        # (sem vazar fora) e ENCHE o corpo do tubo (sem gaps pretos).
-        f'<filter id="mb">'
-        f'<feGaussianBlur stdDeviation="3.5"/>'
-        f'<feColorMatrix type="saturate" values="0"/>'
-        f'<feComponentTransfer>'
-        f'<feFuncR type="table" tableValues="0 0.25 0.81 0.96 1 1 1 1 1 1 1"/>'
-        f'<feFuncG type="table" tableValues="0 0.25 0.81 0.96 1 1 1 1 1 1 1"/>'
-        f'<feFuncB type="table" tableValues="0 0.25 0.81 0.96 1 1 1 1 1 1 1"/>'
-        f'</feComponentTransfer></filter>'
-        f'<mask id="tube" maskUnits="userSpaceOnUse" x="0" y="0" '
-        f'width="{W}" height="{H}">'
-        f'<image xlink:href="{img_href}" href="{img_href}" x="0" y="0" '
-        f'width="{W}" height="{H}" preserveAspectRatio="xMidYMid slice" '
-        f'filter="url(#mb)"/>'
-        f'</mask></defs>'
-        f'<g mask="url(#tube)">{"".join(rows)}</g></svg>'
-    )
-    svg_b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
-    return f'url("data:image/svg+xml;base64,{svg_b64}")'
+            data = f.read_bytes()
+            b64 = base64.b64encode(data).decode("ascii")
+            return f'url("data:{mime};base64,{b64}") center/cover fixed no-repeat, '
+    return ""
 
 
 HERO_BG = _hero_bg_layer()
 # Só a parte url("data:…") — usada na camada animada de fundo (sem `fixed`, que
 # entra em conflito com transform). Vazio se não houver imagem de hero.
 HERO_URL = HERO_BG.split(" center/cover")[0] if HERO_BG else ""
-# Camada 2 (::after): fórmulas dos algoritmos numa espiral, sobre a foto.
-FORMULA_URL = _formula_spiral_uri()
 
 st.markdown(
     f"""
@@ -343,31 +300,18 @@ st.markdown(
         mask:radial-gradient(circle at 50% 47%,
             #000 42%, rgba(0,0,0,.5) 66%, transparent 84%) 50% 47% / 0% 0% no-repeat;
         animation:heroGrow 2.8s cubic-bezier(.2,.7,.2,1) both;}}
-      /* ── Camada 2: FÓRMULAS — preenchem a tela mas são MASCARADAS pela própria
-            foto (luminância): aparecem só onde o tubo glow é brilhante = seguem o
-            caracol automaticamente, sem traçar. Mesma escala/cover da foto. ──── */
-      .stApp::after {{
-        content:""; position:fixed; inset:-6%; z-index:0; pointer-events:none;
-        background:{FORMULA_URL} center/cover no-repeat;
-        opacity:0; transform:scale(1.05); will-change:opacity,transform;
-        mix-blend-mode:screen;
-        animation:formReveal 2.6s ease-out 0.5s both;}}
-      /* conteúdo sempre ACIMA das camadas de fundo */
+      /* conteúdo sempre ACIMA do fundo (fórmulas já estão assadas na foto) */
       [data-testid="stMain"], [data-testid="stSidebar"],
       [data-testid="stHeader"] {{position:relative; z-index:1;}}
       @keyframes heroGrow {{
         0%   {{opacity:0;   transform:scale(1.02);
                -webkit-mask-size:0% 0%; mask-size:0% 0%;}}
-        60%  {{opacity:.26;}}
-        100% {{opacity:.26; transform:scale(1.05);
+        60%  {{opacity:.34;}}
+        100% {{opacity:.34; transform:scale(1.05);
                -webkit-mask-size:340% 340%; mask-size:340% 340%;}}}}
-      @keyframes formReveal {{
-        0%   {{opacity:0;}}
-        100% {{opacity:.55;}}}}
       @media (prefers-reduced-motion: reduce) {{
-        .stApp::before {{animation:none; opacity:.26;
-          filter:none; -webkit-mask:none; mask:none;}}
-        .stApp::after {{animation:none; opacity:.55;}}}}
+        .stApp::before {{animation:none; opacity:.34;
+          filter:none; -webkit-mask:none; mask:none;}}}}
       /* ── Layout base ─────────────────────────────────────────── */
       .block-container {{padding-top:1rem;padding-bottom:0.5rem;max-width:1400px;}}
       [data-testid="stSidebar"] {{background:{PANEL2};border-right:1px solid rgba(255,255,255,.05);}}
@@ -395,9 +339,13 @@ st.markdown(
       /* help "?" tooltip icon */
       [data-testid="stSidebar"] [data-testid="stTooltipIcon"] svg {{opacity:.65;}}
       /* cabeçalho de seção da sidebar — consistente, com acento */
-      .side-sect {{display:flex;align-items:center;gap:9px;margin:4px 0 12px;
+      .side-sect {{display:flex;align-items:center;gap:9px;margin:6px 0 12px;
+        padding:7px 11px;border-radius:9px;
         font-size:.72rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;
-        color:#C3D0EC;}}
+        color:#E2EAFB;
+        background:linear-gradient(90deg,{hex_rgba(CYAN,.16)},rgba(0,0,0,0));
+        border:1px solid {hex_rgba(CYAN,.14)};
+        border-left:3px solid {CYAN};}}
       .side-sect::before {{content:"";width:4px;height:14px;border-radius:2px;flex-shrink:0;
         background:linear-gradient(180deg,{VIOLET},{CYAN});
         box-shadow:0 0 8px {hex_rgba(CYAN,.55)};}}
@@ -975,7 +923,25 @@ with st.sidebar:
     horizon = st.session_state["sim_horizon"]
     seed    = st.session_state["sim_seed"]
 
-    st.caption(f"Rodando com {horizon:,} rounds · seed {seed}")
+    st.markdown(
+        f'<div style="display:flex;gap:8px;margin:4px 0 2px">'
+        f'<div style="flex:1;background:rgba(255,255,255,.03);'
+        f'border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:9px 8px;'
+        f'text-align:center">'
+        f'<div style="font-size:1.08rem;font-weight:800;color:{CYAN};line-height:1">'
+        f'{horizon:,}</div>'
+        f'<div style="font-size:.60rem;color:{MUTED};text-transform:uppercase;'
+        f'letter-spacing:.10em;margin-top:3px">rounds</div></div>'
+        f'<div style="flex:1;background:rgba(255,255,255,.03);'
+        f'border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:9px 8px;'
+        f'text-align:center">'
+        f'<div style="font-size:1.08rem;font-weight:800;color:{GOLD};line-height:1">'
+        f'{seed}</div>'
+        f'<div style="font-size:.60rem;color:{MUTED};text-transform:uppercase;'
+        f'letter-spacing:.10em;margin-top:3px">seed</div></div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
     st.divider()
 
     # ── Serviços ─────────────────────────────────────────────────────────────
@@ -2653,16 +2619,6 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
                 f'<span style="font-size:.74rem;background:rgba(255,255,255,.05);'
                 f'border-radius:6px;padding:4px 10px;color:{MUTED}">'
                 f'<b style="color:{TEXT}">Query RAG:</b> {_trace.get("rag_query","—")}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<div style="margin-top:8px">'
-                f'<div style="font-size:.72rem;font-weight:700;color:{MUTED};'
-                f'letter-spacing:.08em;margin-bottom:4px">PROMPT ENVIADO AO MODELO</div>'
-                f'<pre style="font-size:.72rem;color:{MUTED};background:rgba(0,0,0,.25);'
-                f'border-radius:8px;padding:10px 14px;white-space:pre-wrap;line-height:1.5;'
-                f'border:1px solid rgba(255,255,255,.06)">{_trace.get("prompt_snippet","—")}</pre>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
