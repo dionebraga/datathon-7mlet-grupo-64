@@ -196,24 +196,17 @@ def logo_svg(size: int = 34, gid: str = "lg") -> str:
     )
 
 
-# Caracol: pontos do centro do tubo glow (viewBox 1600×900) — as fórmulas correm
-# AO LONGO deste caminho (cada caractere girado na tangente) → ficam COMPLETAS.
-_CARACOL_WP = [
-    (0, 455), (190, 485), (345, 410), (445, 250), (560, 95), (700, 100),
-    (800, 225), (810, 365), (720, 430), (605, 440), (510, 535), (420, 645),
-    (335, 560), (330, 450), (400, 388), (510, 420), (645, 460), (785, 440),
-    (900, 490), (995, 610), (1055, 665), (1110, 560), (1090, 450), (1010, 432),
-    (1045, 485), (1190, 470), (1390, 425), (1600, 375),
-]
-
-
 def _hero_bg_layer() -> str:
     """Fundo (data-URI) = a FOTO do hero COM as fórmulas (na ordem do treino)
-    ASSADAS correndo AO LONGO do tubo glow (caracol) — cada caractere é girado na
-    direção da curva, então as fórmulas aparecem COMPLETAS, seguindo o tubo. O
-    resultado é cacheado em disco (``.hero-baked.jpg``) → rápido nos reruns.
-    Fallback: foto pura."""
+    ASSADAS correndo EXATAMENTE sobre o tubo glow (caracol).
+
+    O caminho é extraído AUTOMATICAMENTE por **esqueletização** (skimage): acha o
+    centro do tubo, quebra em segmentos e escreve a fórmula ao longo de cada um
+    (cada glifo girado na tangente). Resultado cacheado em ``.hero-baked.jpg``
+    (a esqueletização é lenta → roda só na 1ª carga). Fallback: foto pura.
+    """
     import base64
+    import bisect
     import io
     import math
 
@@ -223,51 +216,58 @@ def _hero_bg_layer() -> str:
     if src is None:
         return ""
     cache = public / ".hero-baked.jpg"
-    try:  # usa o cache se for mais novo que a foto original
+    try:
         if cache.exists() and cache.stat().st_mtime >= src.stat().st_mtime:
             b64 = base64.b64encode(cache.read_bytes()).decode("ascii")
             return f'url("data:image/jpeg;base64,{b64}") center/cover fixed no-repeat, '
     except Exception:
         pass
     try:
+        import numpy as np
         from PIL import Image, ImageDraw, ImageFont
+        from scipy.ndimage import binary_closing
+        from skimage.morphology import skeletonize
 
+        # 1) esqueleto do tubo (em ~1000px p/ velocidade) → segmentos do caracol
+        gimg = Image.open(src).convert("L")
+        gimg.thumbnail((1000, 1000))
+        W, H = gimg.size
+        binr = binary_closing(np.asarray(gimg, dtype=np.float32) > 42,
+                              structure=np.ones((7, 7)))
+        sk = set(zip(*[a.tolist() for a in np.where(skeletonize(binr))][::-1]))
+
+        def _nb(p):
+            x, y = p
+            return [(x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                    if (dx, dy) != (0, 0) and (x + dx, y + dy) in sk]
+
+        for _ in range(8):  # poda galhos espúrios
+            for e in [p for p in sk if len(_nb(p)) == 1]:
+                sk.discard(e)
+        nodes = {p for p in sk if len(_nb(p)) != 2} or {min(sk, key=lambda p: p[0])}
+        segs, used = [], set()
+        for node in nodes:
+            for st_ in _nb(node):
+                if (node, st_) in used:
+                    continue
+                seg, prev, cur = [node], node, st_
+                while True:
+                    seg.append(cur)
+                    used.add((prev, cur))
+                    used.add((cur, prev))
+                    nx = [n for n in _nb(cur) if n != prev]
+                    if len(_nb(cur)) != 2 or not nx:
+                        break
+                    prev, cur = cur, nx[0]
+                if len(seg) > 15:
+                    segs.append(seg)
+
+        # 2) bake do texto em cada segmento (coords escaladas p/ a foto cheia)
         photo = Image.open(src).convert("RGB")
         photo.thumbnail((1600, 1600))
         IW, IH = photo.size
-        sx, sy = IW / 1600.0, IH / 900.0
-        wp = [(x * sx, y * sy) for x, y in _CARACOL_WP]
-
-        def _cr(p0, p1, p2, p3, t):
-            t2, t3 = t * t, t * t * t
-            return (0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t
-                           + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
-                           + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
-                    0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t
-                           + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
-                           + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3))
-
-        pts = []
-        for i in range(len(wp) - 1):
-            p0, p1 = wp[max(0, i - 1)], wp[i]
-            p2, p3 = wp[i + 1], wp[min(len(wp) - 1, i + 2)]
-            for j in range(40):
-                pts.append(_cr(p0, p1, p2, p3, j / 40.0))
-        pts.append(wp[-1])
-        dist = [0.0]
-        for i in range(1, len(pts)):
-            dist.append(dist[-1] + math.hypot(pts[i][0] - pts[i - 1][0],
-                                              pts[i][1] - pts[i - 1][1]))
-        total = dist[-1]
-
-        def _at(s):
-            import bisect
-            i = min(bisect.bisect_left(dist, s), len(pts) - 2)
-            x, y = pts[i]
-            x2, y2 = pts[i + 1]
-            return x, y, math.atan2(y2 - y, x2 - x)
-
-        fs = max(18, int(IH * 0.030))
+        sx, sy = IW / W, IH / H
+        fs = max(17, int(IH * 0.030))
         font = None
         for fp_ in ("C:/Windows/Fonts/seguisym.ttf", "C:/Windows/Fonts/segoeui.ttf"):
             try:
@@ -278,24 +278,37 @@ def _hero_bg_layer() -> str:
         if font is None:
             font = ImageFont.load_default()
         seq = (
-            "(1) contexto x  →  (2) θ=inv(A)·b  →  (3) UCB=x^T·θ+α·√(x^T·inv(A)·x)  →  "
-            "(4) a*=argmax UCB  →  (5) reward=margem·P(conv|x)  →  (6) A+=x·x^T ; b+=r·x  →  "
-            "(7) regret=Σ(μ*−μ)  →  "
-        ) * 4
+            "(1) contexto x → (2) θ=inv(A)·b → (3) UCB=x^T·θ+α·√(x^T·inv(A)·x) → "
+            "(4) a*=argmax UCB → (5) reward=margem·P(conv|x) → (6) A+=x·x^T → "
+            "(7) regret=Σ(μ*−μ) → "
+        )
         layer = Image.new("RGBA", (IW, IH), (0, 0, 0, 0))
-        s = 6.0
         box = int(fs * 1.9)
-        for ch in seq:
-            w = font.getlength(ch) or fs * 0.4
-            if s + w > total:
-                break
-            x, y, ang = _at(s + w / 2)
-            ci = Image.new("RGBA", (box, box), (0, 0, 0, 0))
-            ImageDraw.Draw(ci).text((box / 2, box / 2), ch, font=font,
-                                    fill=(232, 243, 255, 255), anchor="mm")
-            ci = ci.rotate(-math.degrees(ang), expand=True, resample=Image.BICUBIC)
-            layer.alpha_composite(ci, (int(x - ci.width / 2), int(y - ci.height / 2)))
-            s += w
+        for seg in segs:
+            pp = [(x * sx, y * sy) for x, y in seg]
+            dist = [0.0]
+            for i in range(1, len(pp)):
+                dist.append(dist[-1] + math.hypot(pp[i][0] - pp[i - 1][0],
+                                                  pp[i][1] - pp[i - 1][1]))
+            tot = dist[-1]
+            if tot < fs * 2:
+                continue
+            txt = seq * (int(tot / (len(seq) * fs * 0.42)) + 2)
+            s = 2.0
+            for ch in txt:
+                w = font.getlength(ch) or fs * 0.4
+                if s + w > tot:
+                    break
+                i = min(bisect.bisect_left(dist, s + w / 2), len(pp) - 2)
+                x, y = pp[i]
+                x2, y2 = pp[i + 1]
+                ang = math.atan2(y2 - y, x2 - x)
+                ci = Image.new("RGBA", (box, box), (0, 0, 0, 0))
+                ImageDraw.Draw(ci).text((box / 2, box / 2), ch, font=font,
+                                        fill=(232, 243, 255, 255), anchor="mm")
+                ci = ci.rotate(-math.degrees(ang), expand=True, resample=Image.BICUBIC)
+                layer.alpha_composite(ci, (int(x - ci.width / 2), int(y - ci.height / 2)))
+                s += w
         base = photo.convert("RGBA")
         base.alpha_composite(layer)
         buf = io.BytesIO()
