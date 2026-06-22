@@ -357,7 +357,7 @@ def _hero_bg_layer() -> str:
                     if x + cw > se - 1:
                         break
                     draw.text((x, row - fs_sml // 2), ch, font=font_sml,
-                              fill=(215, 235, 255, 108))
+                              fill=(205, 225, 255, 34))
                     x += cw + 1
 
         # ═══════════════════════════════════════════════════════════════
@@ -396,7 +396,7 @@ def _hero_bg_layer() -> str:
                 ph_h  = fs_big + pad * 2 + 4
                 pi    = Image.new("RGBA", (max(ph_w, 10), max(ph_h, 10)), (0, 0, 0, 0))
                 ImageDraw.Draw(pi).text((pad, pad + 2), phrase, font=font_big,
-                                        fill=(238, 248, 255, 228))
+                                        fill=(225, 240, 255, 72))
                 pr = pi.rotate(ang_d, expand=True, resample=Image.BICUBIC)
 
                 mx, my = pp[idx]
@@ -491,6 +491,21 @@ st.markdown(
       [data-testid="stSidebar"] {{background:{PANEL2};border-right:1px solid rgba(255,255,255,.05);}}
       div[data-testid="column"] {{padding:0 8px;}}
       button[data-testid="StyledFullScreenButton"] {{display:none !important;}}
+      /* ── Labels da ÁREA PRINCIPAL (Explorador de decisão) — legíveis ──
+         realce com cor clara + peso + sombra para destacar do fundo do caracol */
+      [data-testid="stMain"] label,
+      [data-testid="stMain"] [data-testid="stWidgetLabel"] p,
+      [data-testid="stMain"] [data-testid="stWidgetLabel"] label,
+      [data-testid="stMain"] [data-testid="stWidgetLabel"] div {{
+        color:#EAF0FC !important; font-weight:700 !important; font-size:.94rem !important;
+        letter-spacing:.005em;
+        text-shadow:0 1px 3px rgba(0,0,0,.96), 0 0 9px rgba(0,0,0,.85) !important;}}
+      /* valor/ticks dos sliders na área principal também legíveis */
+      [data-testid="stMain"] [data-testid="stSliderTickBarMin"],
+      [data-testid="stMain"] [data-testid="stSliderTickBarMax"],
+      [data-testid="stMain"] [data-testid="stSliderThumbValue"] {{
+        color:#CBD8F2 !important;
+        text-shadow:0 1px 3px rgba(0,0,0,.95) !important;}}
       /* ── Sidebar — legibilidade máxima ───────────────────────── */
       [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{padding-top:1.4rem;}}
       [data-testid="stSidebar"] label,
