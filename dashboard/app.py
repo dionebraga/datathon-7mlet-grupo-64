@@ -196,71 +196,119 @@ def logo_svg(size: int = 34, gid: str = "lg") -> str:
     )
 
 
+# Caracol: pontos do centro do tubo glow (viewBox 1600×900) — as fórmulas correm
+# AO LONGO deste caminho (cada caractere girado na tangente) → ficam COMPLETAS.
+_CARACOL_WP = [
+    (0, 455), (190, 485), (345, 410), (445, 250), (560, 95), (700, 100),
+    (800, 225), (810, 365), (720, 430), (605, 440), (510, 535), (420, 645),
+    (335, 560), (330, 450), (400, 388), (510, 420), (645, 460), (785, 440),
+    (900, 490), (995, 610), (1055, 665), (1110, 560), (1090, 450), (1010, 432),
+    (1045, 485), (1190, 470), (1390, 425), (1600, 375),
+]
+
+
 def _hero_bg_layer() -> str:
     """Fundo (data-URI) = a FOTO do hero COM as fórmulas (na ordem do treino)
-    ASSADAS dentro do tubo glow (caracol), usando a luminância da própria foto como
-    máscara — assim ficam só sobre o tubo, sem vazar. O PIL renderiza e compõe
-    (controle exato de pixel). Em caso de falha, cai para a foto pura.
-    """
+    ASSADAS correndo AO LONGO do tubo glow (caracol) — cada caractere é girado na
+    direção da curva, então as fórmulas aparecem COMPLETAS, seguindo o tubo. O
+    resultado é cacheado em disco (``.hero-baked.jpg``) → rápido nos reruns.
+    Fallback: foto pura."""
     import base64
     import io
+    import math
 
     public = ROOT / "frontend" / "public"
-    for name, mime in (("hero-bg.png", "image/png"), ("hero-bg.jpg", "image/jpeg"),
-                       ("hero-bg.jpeg", "image/jpeg")):
-        f = public / name
-        if not f.exists():
-            continue
-        try:
-            import numpy as _np
-            from PIL import Image, ImageDraw, ImageFilter, ImageFont
-
-            photo = Image.open(f).convert("RGB")
-            photo.thumbnail((1600, 1600))
-            IW, IH = photo.size
-            fs = max(15, int(IH * 0.033))
-            font = None
-            for fp_ in ("C:/Windows/Fonts/seguisym.ttf", "C:/Windows/Fonts/segoeui.ttf"):
-                try:
-                    font = ImageFont.truetype(fp_, fs)
-                    break
-                except Exception:
-                    pass
-            if font is None:
-                font = ImageFont.load_default()
-            # Sequência NA ORDEM do loop de treino do bandit contextual.
-            line = (
-                "(1) contexto x → (2) θ=inv(A)·b → (3) UCB=x^T·θ+α·√(x^T·inv(A)·x) → "
-                "(4) a*=argmax UCB → (5) reward=margem·P(conv|x) → (6) A+=x·x^T ; b+=r·x → "
-                "(7) regret=Σ(μ*−μ) → "
-            ) * 2
-            txt = Image.new("L", (IW, IH), 0)
-            dd = ImageDraw.Draw(txt)
-            y, k = 0, 0
-            while y < IH:
-                dd.text((-180 - (k % 4) * 65, y), line, fill=255, font=font)
-                y += int(fs * 1.32)
-                k += 1
-            # máscara do tubo: blur leve (preenche miolos) + curva que ZERA o halo
-            # fraco (sem vazar) e ENCHE o corpo do tubo (sem gaps).
-            g = photo.convert("L").filter(ImageFilter.GaussianBlur(2))
-            M = _np.interp(_np.asarray(g, dtype=_np.float32) / 255.0,
-                           [0, 0.11, 0.19, 0.36, 1.0],
-                           [0, 0, 0.85, 1.0, 1.0]).astype(_np.float32)
-            P = _np.asarray(photo, dtype=_np.float32)
-            T = _np.asarray(txt, dtype=_np.float32) / 255.0
-            a = (T * M).clip(0, 1)[..., None]
-            top = _np.array([235., 245., 255.], dtype=_np.float32)
-            out = (255 - (255 - P) * (255 - top * a) / 255).clip(0, 255).astype("uint8")  # screen
-            buf = io.BytesIO()
-            Image.fromarray(out).save(buf, format="JPEG", quality=84, optimize=True)
-            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    src = next((public / n for n in ("hero-bg.png", "hero-bg.jpg", "hero-bg.jpeg")
+                if (public / n).exists()), None)
+    if src is None:
+        return ""
+    cache = public / ".hero-baked.jpg"
+    try:  # usa o cache se for mais novo que a foto original
+        if cache.exists() and cache.stat().st_mtime >= src.stat().st_mtime:
+            b64 = base64.b64encode(cache.read_bytes()).decode("ascii")
             return f'url("data:image/jpeg;base64,{b64}") center/cover fixed no-repeat, '
+    except Exception:
+        pass
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+
+        photo = Image.open(src).convert("RGB")
+        photo.thumbnail((1600, 1600))
+        IW, IH = photo.size
+        sx, sy = IW / 1600.0, IH / 900.0
+        wp = [(x * sx, y * sy) for x, y in _CARACOL_WP]
+
+        def _cr(p0, p1, p2, p3, t):
+            t2, t3 = t * t, t * t * t
+            return (0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t
+                           + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+                           + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+                    0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t
+                           + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+                           + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3))
+
+        pts = []
+        for i in range(len(wp) - 1):
+            p0, p1 = wp[max(0, i - 1)], wp[i]
+            p2, p3 = wp[i + 1], wp[min(len(wp) - 1, i + 2)]
+            for j in range(40):
+                pts.append(_cr(p0, p1, p2, p3, j / 40.0))
+        pts.append(wp[-1])
+        dist = [0.0]
+        for i in range(1, len(pts)):
+            dist.append(dist[-1] + math.hypot(pts[i][0] - pts[i - 1][0],
+                                              pts[i][1] - pts[i - 1][1]))
+        total = dist[-1]
+
+        def _at(s):
+            import bisect
+            i = min(bisect.bisect_left(dist, s), len(pts) - 2)
+            x, y = pts[i]
+            x2, y2 = pts[i + 1]
+            return x, y, math.atan2(y2 - y, x2 - x)
+
+        fs = max(18, int(IH * 0.030))
+        font = None
+        for fp_ in ("C:/Windows/Fonts/seguisym.ttf", "C:/Windows/Fonts/segoeui.ttf"):
+            try:
+                font = ImageFont.truetype(fp_, fs)
+                break
+            except Exception:
+                pass
+        if font is None:
+            font = ImageFont.load_default()
+        seq = (
+            "(1) contexto x  →  (2) θ=inv(A)·b  →  (3) UCB=x^T·θ+α·√(x^T·inv(A)·x)  →  "
+            "(4) a*=argmax UCB  →  (5) reward=margem·P(conv|x)  →  (6) A+=x·x^T ; b+=r·x  →  "
+            "(7) regret=Σ(μ*−μ)  →  "
+        ) * 4
+        layer = Image.new("RGBA", (IW, IH), (0, 0, 0, 0))
+        s = 6.0
+        box = int(fs * 1.9)
+        for ch in seq:
+            w = font.getlength(ch) or fs * 0.4
+            if s + w > total:
+                break
+            x, y, ang = _at(s + w / 2)
+            ci = Image.new("RGBA", (box, box), (0, 0, 0, 0))
+            ImageDraw.Draw(ci).text((box / 2, box / 2), ch, font=font,
+                                    fill=(232, 243, 255, 255), anchor="mm")
+            ci = ci.rotate(-math.degrees(ang), expand=True, resample=Image.BICUBIC)
+            layer.alpha_composite(ci, (int(x - ci.width / 2), int(y - ci.height / 2)))
+            s += w
+        base = photo.convert("RGBA")
+        base.alpha_composite(layer)
+        buf = io.BytesIO()
+        base.convert("RGB").save(buf, format="JPEG", quality=85, optimize=True)
+        try:
+            cache.write_bytes(buf.getvalue())
         except Exception:
-            data = f.read_bytes()
-            b64 = base64.b64encode(data).decode("ascii")
-            return f'url("data:{mime};base64,{b64}") center/cover fixed no-repeat, '
-    return ""
+            pass
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        return f'url("data:image/jpeg;base64,{b64}") center/cover fixed no-repeat, '
+    except Exception:
+        b64 = base64.b64encode(src.read_bytes()).decode("ascii")
+        return f'url("data:image/png;base64,{b64}") center/cover fixed no-repeat, '
 
 
 HERO_BG = _hero_bg_layer()
@@ -299,18 +347,24 @@ st.markdown(
             #000 42%, rgba(0,0,0,.5) 66%, transparent 84%) 50% 47% / 0% 0% no-repeat;
         mask:radial-gradient(circle at 50% 47%,
             #000 42%, rgba(0,0,0,.5) 66%, transparent 84%) 50% 47% / 0% 0% no-repeat;
-        animation:heroGrow 2.8s cubic-bezier(.2,.7,.2,1) both;}}
-      /* conteúdo sempre ACIMA do fundo (fórmulas já estão assadas na foto) */
+        animation:heroGrow 2.8s cubic-bezier(.2,.7,.2,1) both,
+                  heroDrift 46s ease-in-out 2.8s infinite alternate;}}
+      /* conteúdo sempre ACIMA do fundo (fórmulas já estão assadas na foto, então
+         elas se movem JUNTO com a imagem) */
       [data-testid="stMain"], [data-testid="stSidebar"],
       [data-testid="stHeader"] {{position:relative; z-index:1;}}
       @keyframes heroGrow {{
-        0%   {{opacity:0;   transform:scale(1.02);
+        0%   {{opacity:0;   transform:scale(1.04);
                -webkit-mask-size:0% 0%; mask-size:0% 0%;}}
-        60%  {{opacity:.34;}}
-        100% {{opacity:.34; transform:scale(1.05);
+        60%  {{opacity:.46;}}
+        100% {{opacity:.46; transform:scale(1.06);
                -webkit-mask-size:340% 340%; mask-size:340% 340%;}}}}
+      @keyframes heroDrift {{
+        0%   {{transform:scale(1.06) translate3d(0,0,0);}}
+        50%  {{transform:scale(1.12) translate3d(-1.6%,1.1%,0);}}
+        100% {{transform:scale(1.09) translate3d(1.6%,-1.1%,0);}}}}
       @media (prefers-reduced-motion: reduce) {{
-        .stApp::before {{animation:none; opacity:.34;
+        .stApp::before {{animation:none; opacity:.46;
           filter:none; -webkit-mask:none; mask:none;}}}}
       /* ── Layout base ─────────────────────────────────────────── */
       .block-container {{padding-top:1rem;padding-bottom:0.5rem;max-width:1400px;}}
@@ -2177,12 +2231,12 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
     st.markdown(
         "<style>"
         f"@keyframes heroRegrow{_dn}{{"
-        "0%{opacity:0;-webkit-mask-size:0% 0%;mask-size:0% 0%;transform:scale(1.02);}"
-        "60%{opacity:.26;}"
-        "100%{opacity:.26;-webkit-mask-size:340% 340%;mask-size:340% 340%;transform:scale(1.05);}}"
+        "0%{opacity:0;-webkit-mask-size:0% 0%;mask-size:0% 0%;transform:scale(1.04);}"
+        "60%{opacity:.46;}"
+        "100%{opacity:.46;-webkit-mask-size:340% 340%;mask-size:340% 340%;transform:scale(1.06);}}"
         ".stApp::before{"
         f"animation:heroRegrow{_dn} 2.4s cubic-bezier(.2,.7,.2,1) both,"
-        "heroDrift 44s ease-in-out 2.4s infinite alternate !important;}"
+        "heroDrift 46s ease-in-out 2.4s infinite alternate !important;}"
         "</style>",
         unsafe_allow_html=True,
     )
