@@ -164,6 +164,12 @@ class DecisionOut(BaseModel):
         description="Mapa braço → score ponderado por margem (ranqueamento da política).",
         examples=[{"OFF_LOAN_PREAPP": 25.5, "OFF_TD_PREMIUM": 8.6}],
     )
+    segment_id: str = Field(
+        default="", description="Persona comportamental do cliente.", examples=["seg_senior_conserv"]
+    )
+    segment_label: str = Field(
+        default="", description="Rótulo legível da persona.", examples=["Sênior conservador"]
+    )
 
 
 class OfferOut(BaseModel):

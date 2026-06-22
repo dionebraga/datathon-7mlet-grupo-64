@@ -26,6 +26,7 @@ from adaptive_offers.feature_store.store import FeatureStore
 from adaptive_offers.logging_utils import get_logger, utc_now_iso
 from adaptive_offers.policy.reason_codes import enrich
 from adaptive_offers.policy.versioning import PolicyMetadata, load_policy
+from adaptive_offers.segmentation import segment_of
 
 logger = get_logger("policy.decision_service")
 
@@ -51,6 +52,8 @@ class DecisionRecord:
     reasons: list[dict[str, str]] = field(default_factory=list)
     estimates: dict[str, float] = field(default_factory=dict)
     scores: dict[str, float] = field(default_factory=dict)
+    segment_id: str = ""
+    segment_label: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -106,6 +109,7 @@ class DecisionService:
 
         arm = self.by_id[decision.arm_id]
         exp_rew = expected_reward(arm, ctx_vec)
+        seg = segment_of(features)
         self._counter += 1
         record = DecisionRecord(
             decision_id=f"dec_{self._counter:08d}",
@@ -123,6 +127,8 @@ class DecisionService:
             reasons=enrich(codes),
             estimates={k: round(float(v), 4) for k, v in decision.estimates.items()},
             scores={k: round(float(v), 4) for k, v in (decision.scores or {}).items()},
+            segment_id=seg.seg_id,
+            segment_label=seg.label,
         )
         if log:
             self._audit(record)
