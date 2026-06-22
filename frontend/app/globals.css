@@ -20,6 +20,9 @@
 }
 
 @layer base {
+  html {
+    font-size: 17px; /* base maior → fontes (rem) ~6% maiores em todo o site */
+  }
   html,
   body {
     min-height: 100%;

@@ -452,6 +452,7 @@ st.markdown(
         visibility: visible !important; opacity: 1 !important;
         display: flex !important; pointer-events: all !important; z-index: 999999 !important;}}
       [data-testid="stSidebarCollapseButton"] {{display: none !important;}}
+      html {{font-size:17px;}}  /* base maior → todas as fontes em rem sobem ~6% */
       html, body, [class*="css"], .stApp {{font-family:'Inter',system-ui,sans-serif;}}
       /* base preta na raiz; .stApp transparente p/ a imagem do ::before aparecer */
       html, body {{background:{BG};}}
@@ -804,17 +805,17 @@ def tile(col, label: str, value: str, series, color: str, desc: str = "") -> Non
     ))
     fig.update_layout(
         showlegend=False,
-        height=190,
-        margin={"l": 8, "r": 8, "t": 52, "b": 8},
+        height=215,
+        margin={"l": 8, "r": 8, "t": 56, "b": 8},
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis={"visible": False}, yaxis={"visible": False},
         annotations=[
             {"text": label.upper(), "x": 0.01, "y": 1.0, "xref": "paper", "yref": "paper",
              "showarrow": False, "xanchor": "left", "yanchor": "bottom",
-             "font": {"size": 13, "color": MUTED, "family": "Inter"}},
+             "font": {"size": 15, "color": MUTED, "family": "Inter"}},
             {"text": value, "x": 0.01, "y": 0.50, "xref": "paper", "yref": "paper",
              "showarrow": False, "xanchor": "left",
-             "font": {"size": 36, "color": color, "family": "Inter", "weight": 800}},
+             "font": {"size": 44, "color": color, "family": "Inter", "weight": 800}},
         ],
     )
     col.plotly_chart(fig, config={**NO_BAR, "scrollZoom": False}, **fill())
@@ -1279,7 +1280,7 @@ tile(k4, "Lift vs baseline", f"+{best.get('lift_vs_baseline_pct', 0):.0f}%", lif
 # --------------------------------------------------------------------------- #
 # Dense panel grid (New Relic style) — compact builders
 # --------------------------------------------------------------------------- #
-GRID_H = 340
+GRID_H = 420
 PLABELS = [POLICY_LABEL.get(p, p) for p in sdf["policy"]]
 PCOLORS = [POLICY_COLORS.get(p, VIOLET) for p in sdf["policy"]]
 
@@ -1611,9 +1612,9 @@ def p_window_regret(title: str) -> go.Figure:
             hovertemplate=f"<b>{POLICY_LABEL.get(name, name)}</b><br>%{{x}}: %{{y:.4f}} regret/step<extra></extra>",
         ))
     fig.update_xaxes(tickangle=-35, automargin=True,
-                     tickfont=dict(size=8, color=MUTED))
+                     tickfont=dict(size=12, color=MUTED))
     fig.update_yaxes(tickformat=".3f", automargin=True,
-                     tickfont=dict(size=9, color=MUTED))
+                     tickfont=dict(size=12, color=MUTED))
     return style_panel(fig, title, height=GRID_H + 20)
 
 
