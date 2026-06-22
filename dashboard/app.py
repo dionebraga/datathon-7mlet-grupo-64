@@ -197,13 +197,16 @@ def logo_svg(size: int = 34, gid: str = "lg") -> str:
 
 
 def _hero_bg_layer() -> str:
-    """Fundo (data-URI) = a FOTO do hero COM as fórmulas (na ordem do treino)
-    ASSADAS correndo EXATAMENTE sobre o tubo glow (caracol).
+    """Bakes ML training formulas into the hero-bg image (caracol tube).
 
-    O caminho é extraído AUTOMATICAMENTE por **esqueletização** (skimage): acha o
-    centro do tubo, quebra em segmentos e escreve a fórmula ao longo de cada um
-    (cada glifo girado na tangente). Resultado cacheado em ``.hero-baked.jpg``
-    (a esqueletização é lenta → roda só na 1ª carga). Fallback: foto pura.
+    Two-layer strategy:
+      1) Horizontal grid fill — dense, semi-transparent Times text covering every
+         dark area inside the tube mask (fills hollow interiors completely).
+      2) Skeleton-path overlay — each formula phrase rendered as a whole string
+         then rotated to the local tangent angle (no per-char rotation = crisp).
+
+    Font: Times New Roman (serif, clearly "written" not "drawn").
+    Cache: .hero-baked.jpg — only regenerated when src is newer.
     """
     import base64
     import bisect
@@ -225,26 +228,58 @@ def _hero_bg_layer() -> str:
     try:
         import numpy as np
         from PIL import Image, ImageDraw, ImageFont
-        from scipy.ndimage import binary_closing
+        from scipy.ndimage import binary_closing, binary_dilation
+        from scipy.ndimage import label as _ndlabel
         from skimage.morphology import skeletonize
 
-        # 1) esqueleto do tubo (em ~1000px p/ velocidade) → segmentos do caracol
+        # Formula sequence — training order, Unicode math for Times readability
+        PARTS = [
+            "(1) contexto x",
+            "(2) θ = A⁻¹·b",
+            "(3) UCB = xᵀθ + α√(xᵀA⁻¹x)",
+            "(4) a* = argmax UCB",
+            "(5) reward = margem·P(conv|x)",
+            "(6) A += x·xᵀ,  b += r·x",
+            "(7) regret = Σ(μ* − μₐ)",
+        ]
+        SEP  = "  →  "
+        FULL = SEP.join(PARTS) + SEP
+
+        # Work at reduced resolution for speed
         gimg = Image.open(src).convert("L")
-        gimg.thumbnail((1000, 1000))
+        gimg.thumbnail((900, 900))
         W, H = gimg.size
-        binr = binary_closing(np.asarray(gimg, dtype=np.float32) > 42,
-                              structure=np.ones((7, 7)))
-        sk = set(zip(*[a.tolist() for a in np.where(skeletonize(binr))][::-1]))
+        arr  = np.asarray(gimg, dtype=np.float32)
+
+        # Threshold: top ~10% of pixels = the bright glowing tube only
+        # p90 of luminance = 24; threshold > 26 catches tube, excludes background
+        raw_mask  = arr > 26
+        # Small closing: connect adjacent bright pixels on the same strand
+        tube_mask = binary_closing(raw_mask, structure=np.ones((9, 9)))
+        # Dilation: expand to full tube cross-section width so text stays inside
+        tube_mask = binary_dilation(tube_mask, structure=np.ones((7, 7)))
+
+        # Keep only the largest connected component (= the caracol itself)
+        labeled, num = _ndlabel(tube_mask)
+        if num > 0:
+            sizes = [(labeled == i).sum() for i in range(1, num + 1)]
+            tube_mask = (labeled == (sizes.index(max(sizes)) + 1))
+
+        # Skeletonize to get centerline for path-following text
+        sk = set(zip(*[a.tolist() for a in np.where(skeletonize(tube_mask))][::-1]))
 
         def _nb(p):
             x, y = p
             return [(x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)
                     if (dx, dy) != (0, 0) and (x + dx, y + dy) in sk]
 
-        for _ in range(8):  # poda galhos espúrios
-            for e in [p for p in sk if len(_nb(p)) == 1]:
+        for _ in range(14):  # prune spurious tips aggressively
+            tips = [p for p in list(sk) if len(_nb(p)) <= 1]
+            for e in tips:
                 sk.discard(e)
-        nodes = {p for p in sk if len(_nb(p)) != 2} or {min(sk, key=lambda p: p[0])}
+
+        nodes = ({p for p in sk if len(_nb(p)) != 2}
+                 or ({min(sk, key=lambda p: p[0])} if sk else set()))
         segs, used = [], set()
         for node in nodes:
             for st_ in _nb(node):
@@ -253,66 +288,136 @@ def _hero_bg_layer() -> str:
                 seg, prev, cur = [node], node, st_
                 while True:
                     seg.append(cur)
-                    used.add((prev, cur))
-                    used.add((cur, prev))
+                    used.add((prev, cur)); used.add((cur, prev))
                     nx = [n for n in _nb(cur) if n != prev]
                     if len(_nb(cur)) != 2 or not nx:
                         break
                     prev, cur = cur, nx[0]
-                if len(seg) > 15:
+                if len(seg) > 20:
                     segs.append(seg)
+        segs.sort(key=len, reverse=True)  # longest segments first
 
-        # 2) bake do texto em cada segmento (coords escaladas p/ a foto cheia)
+        # Full-size photo
         photo = Image.open(src).convert("RGB")
         photo.thumbnail((1600, 1600))
         IW, IH = photo.size
-        sx, sy = IW / W, IH / H
-        fs = max(17, int(IH * 0.030))
-        font = None
-        for fp_ in ("C:/Windows/Fonts/seguisym.ttf", "C:/Windows/Fonts/segoeui.ttf"):
-            try:
-                font = ImageFont.truetype(fp_, fs)
-                break
-            except Exception:
-                pass
-        if font is None:
-            font = ImageFont.load_default()
-        seq = (
-            "(1) contexto x → (2) θ=inv(A)·b → (3) UCB=x^T·θ+α·√(x^T·inv(A)·x) → "
-            "(4) a*=argmax UCB → (5) reward=margem·P(conv|x) → (6) A+=x·x^T → "
-            "(7) regret=Σ(μ*−μ) → "
-        )
+        scale_x, scale_y = IW / W, IH / H
+
+        fs_big = max(20, int(IH * 0.030))   # skeleton overlay font
+        fs_sml = max(11, int(IH * 0.016))   # grid fill font
+
+        def _load_font(size):
+            for fp_ in (
+                "C:/Windows/Fonts/times.ttf",    # Times New Roman Regular
+                "C:/Windows/Fonts/timesbd.ttf",  # Times New Roman Bold
+                "C:/Windows/Fonts/georgia.ttf",  # Georgia serif fallback
+                "C:/Windows/Fonts/segoeui.ttf",  # last-resort UI font
+            ):
+                try:
+                    return ImageFont.truetype(fp_, size)
+                except Exception:
+                    pass
+            return ImageFont.load_default()
+
+        font_big = _load_font(fs_big)
+        font_sml = _load_font(fs_sml)
+
         layer = Image.new("RGBA", (IW, IH), (0, 0, 0, 0))
-        box = int(fs * 1.9)
+        draw  = ImageDraw.Draw(layer)
+
+        # ═══════════════════════════════════════════════════════════════
+        # LAYER 1 — horizontal grid fill (fills ALL dark spaces in tube)
+        # ═══════════════════════════════════════════════════════════════
+        mask_up  = (Image.fromarray((tube_mask.astype(np.uint8)) * 255)
+                    .resize((IW, IH), Image.NEAREST))
+        mask_arr = np.asarray(mask_up) > 0
+
+        line_h  = int(fs_sml * 1.75)
+        seq_rep = FULL * 80       # long enough to fill all rows
+        char_gi = 0               # global char index across all rows/spans
+
+        for row in range(fs_sml, IH - fs_sml, line_h):
+            row_mask = mask_arr[row]
+            in_s, spans, s0 = False, [], 0
+            for col in range(IW):
+                if row_mask[col] and not in_s:
+                    in_s, s0 = True, col
+                elif not row_mask[col] and in_s:
+                    in_s = False; spans.append((s0, col))
+            if in_s:
+                spans.append((s0, IW))
+            for ss, se in spans:
+                if se - ss < fs_sml * 2:
+                    continue
+                x = ss + 2
+                while x < se - fs_sml:
+                    ch = seq_rep[char_gi % len(seq_rep)]
+                    char_gi += 1
+                    cw = max(int(font_sml.getlength(ch)), int(fs_sml * 0.35))
+                    if x + cw > se - 1:
+                        break
+                    draw.text((x, row - fs_sml // 2), ch, font=font_sml,
+                              fill=(215, 235, 255, 108))
+                    x += cw + 1
+
+        # ═══════════════════════════════════════════════════════════════
+        # LAYER 2 — skeleton overlay: phrase-by-phrase rotation (crisp)
+        # ═══════════════════════════════════════════════════════════════
+        part_idx = 0
         for seg in segs:
-            pp = [(x * sx, y * sy) for x, y in seg]
+            pp = [(x * scale_x, y * scale_y) for x, y in seg]
             dist = [0.0]
             for i in range(1, len(pp)):
-                dist.append(dist[-1] + math.hypot(pp[i][0] - pp[i - 1][0],
-                                                  pp[i][1] - pp[i - 1][1]))
+                dist.append(dist[-1] + math.hypot(
+                    pp[i][0] - pp[i - 1][0], pp[i][1] - pp[i - 1][1]))
             tot = dist[-1]
-            if tot < fs * 2:
+            if tot < fs_big * 5:
                 continue
-            txt = seq * (int(tot / (len(seq) * fs * 0.42)) + 2)
-            s = 2.0
-            for ch in txt:
-                w = font.getlength(ch) or fs * 0.4
-                if s + w > tot:
+
+            s = float(fs_big)
+            while s < tot - fs_big * 2:
+                phrase = PARTS[part_idx % len(PARTS)]
+                part_idx += 1
+                pw = max(font_big.getlength(phrase), fs_big * 0.5)
+                if s + pw > tot - fs_big:
                     break
-                i = min(bisect.bisect_left(dist, s + w / 2), len(pp) - 2)
-                x, y = pp[i]
-                x2, y2 = pp[i + 1]
-                ang = math.atan2(y2 - y, x2 - x)
-                ci = Image.new("RGBA", (box, box), (0, 0, 0, 0))
-                ImageDraw.Draw(ci).text((box / 2, box / 2), ch, font=font,
-                                        fill=(232, 243, 255, 255), anchor="mm")
-                ci = ci.rotate(-math.degrees(ang), expand=True, resample=Image.BICUBIC)
-                layer.alpha_composite(ci, (int(x - ci.width / 2), int(y - ci.height / 2)))
-                s += w
+
+                t_mid = s + pw / 2
+                idx   = min(bisect.bisect_left(dist, t_mid), len(pp) - 2)
+                i0    = max(0, idx - 4)
+                i1    = min(len(pp) - 1, idx + 4)
+                dx    = pp[i1][0] - pp[i0][0]
+                dy    = pp[i1][1] - pp[i0][1]
+                ang_d = -math.degrees(math.atan2(dy, dx))
+
+                # Render full phrase as one image then rotate (no per-char blur)
+                pad   = 5
+                ph_w  = int(pw) + pad * 2
+                ph_h  = fs_big + pad * 2 + 4
+                pi    = Image.new("RGBA", (max(ph_w, 10), max(ph_h, 10)), (0, 0, 0, 0))
+                ImageDraw.Draw(pi).text((pad, pad + 2), phrase, font=font_big,
+                                        fill=(238, 248, 255, 228))
+                pr = pi.rotate(ang_d, expand=True, resample=Image.BICUBIC)
+
+                mx, my = pp[idx]
+                ox = max(0, min(int(mx - pr.width / 2),  IW - pr.width))
+                oy = max(0, min(int(my - pr.height / 2), IH - pr.height))
+                layer.alpha_composite(pr, (ox, oy))
+
+                s += pw + fs_big * 0.8   # gap between consecutive phrases
+
+        # ── Clamp: zero alpha for any formula pixel outside the tube ──
+        # This is the definitive fix: even if a phrase extends beyond the
+        # tube boundary when rotated, only the part inside the tube is shown.
+        lyr_np = np.asarray(layer).copy()
+        lyr_np[:, :, 3] = np.where(mask_arr, lyr_np[:, :, 3], 0)
+        layer = Image.fromarray(lyr_np, "RGBA")
+
+        # ── Composite + cache ─────────────────────────────────────────
         base = photo.convert("RGBA")
         base.alpha_composite(layer)
         buf = io.BytesIO()
-        base.convert("RGB").save(buf, format="JPEG", quality=85, optimize=True)
+        base.convert("RGB").save(buf, format="JPEG", quality=88, optimize=True)
         try:
             cache.write_bytes(buf.getvalue())
         except Exception:
@@ -321,7 +426,8 @@ def _hero_bg_layer() -> str:
         return f'url("data:image/jpeg;base64,{b64}") center/cover fixed no-repeat, '
     except Exception:
         b64 = base64.b64encode(src.read_bytes()).decode("ascii")
-        return f'url("data:image/png;base64,{b64}") center/cover fixed no-repeat, '
+        ext = src.suffix.lstrip(".")
+        return f'url("data:image/{ext};base64,{b64}") center/cover fixed no-repeat, '
 
 
 HERO_BG = _hero_bg_layer()
@@ -380,7 +486,7 @@ st.markdown(
         .stApp::before {{animation:none; opacity:.46;
           filter:none; -webkit-mask:none; mask:none;}}}}
       /* ── Layout base ─────────────────────────────────────────── */
-      .block-container {{padding-top:1rem;padding-bottom:0.5rem;max-width:1400px;}}
+      .block-container {{padding-top:1.2rem;padding-bottom:0.8rem;max-width:1600px;}}
       [data-testid="stSidebar"] {{background:{PANEL2};border-right:1px solid rgba(255,255,255,.05);}}
       div[data-testid="column"] {{padding:0 8px;}}
       button[data-testid="StyledFullScreenButton"] {{display:none !important;}}
@@ -390,11 +496,11 @@ st.markdown(
       [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
       [data-testid="stSidebar"] [data-testid="stWidgetLabel"] label,
       [data-testid="stSidebar"] [data-testid="stWidgetLabel"] div {{
-        color:#DCE4F5 !important; font-weight:600 !important; font-size:.84rem !important;
+        color:#DCE4F5 !important; font-weight:600 !important; font-size:.90rem !important;
         letter-spacing:.01em;}}
       [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
       [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{
-        color:#A7B6D6 !important; font-size:.76rem !important; font-weight:500;}}
+        color:#A7B6D6 !important; font-size:.82rem !important; font-weight:500;}}
       [data-testid="stSidebar"] hr {{margin:0.9rem 0 !important;
         border-color:rgba(255,255,255,.07) !important;}}
       /* slider ticks/value mais legíveis */
@@ -406,9 +512,9 @@ st.markdown(
       /* help "?" tooltip icon */
       [data-testid="stSidebar"] [data-testid="stTooltipIcon"] svg {{opacity:.65;}}
       /* cabeçalho de seção da sidebar — consistente, com acento */
-      .side-sect {{display:flex;align-items:center;gap:9px;margin:6px 0 12px;
-        padding:7px 11px;border-radius:9px;
-        font-size:.72rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;
+      .side-sect {{display:flex;align-items:center;gap:9px;margin:8px 0 14px;
+        padding:9px 13px;border-radius:9px;
+        font-size:.78rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;
         color:#E2EAFB;
         background:linear-gradient(90deg,{hex_rgba(CYAN,.16)},rgba(0,0,0,0));
         border:1px solid {hex_rgba(CYAN,.14)};
@@ -418,14 +524,14 @@ st.markdown(
         box-shadow:0 0 8px {hex_rgba(CYAN,.55)};}}
       .side-card {{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);
         border-radius:11px;padding:12px 13px;}}
-      .side-legend-row {{display:flex;align-items:baseline;gap:8px;padding:4px 0;
-        font-size:.80rem;color:{MUTED};line-height:1.35;}}
+      .side-legend-row {{display:flex;align-items:baseline;gap:8px;padding:5px 0;
+        font-size:.88rem;color:{MUTED};line-height:1.40;}}
       .side-legend-row b {{color:{TEXT};font-weight:700;}}
       .side-svc {{display:flex;align-items:center;justify-content:space-between;
-        padding:8px 11px;margin-bottom:7px;border-radius:10px;
+        padding:10px 13px;margin-bottom:8px;border-radius:10px;
         background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);}}
-      .side-svc .svc-name {{font-size:.84rem;font-weight:700;color:{TEXT};}}
-      .side-svc .svc-cmd {{font-size:.66rem;color:{MUTED};font-family:monospace;
+      .side-svc .svc-name {{font-size:.92rem;font-weight:700;color:{TEXT};}}
+      .side-svc .svc-cmd {{font-size:.72rem;color:{MUTED};font-family:monospace;
         display:block;margin-top:2px;}}
       /* ── Expander (rastreio de execução) — card escuro coeso ──── */
       [data-testid="stExpander"] {{
@@ -491,39 +597,39 @@ st.markdown(
       .topbar .hero-row {{display:flex;align-items:center;gap:16px;}}
       .topbar .hero-logo {{display:flex;align-items:center;
         filter:drop-shadow(0 4px 14px {hex_rgba(CYAN,.45)});}}
-      .topbar .eyebrow {{color:{CYAN};font-size:.66rem;font-weight:800;
-        letter-spacing:.24em;text-transform:uppercase;margin-bottom:6px;
+      .topbar .eyebrow {{color:{CYAN};font-size:.72rem;font-weight:800;
+        letter-spacing:.24em;text-transform:uppercase;margin-bottom:8px;
         display:flex;align-items:center;gap:8px;}}
-      .topbar .eyebrow::before {{content:"";width:16px;height:2px;border-radius:2px;
+      .topbar .eyebrow::before {{content:"";width:18px;height:2px;border-radius:2px;
         background:{CYAN};display:inline-block;}}
-      .topbar h1 {{margin:0;font-size:2.15rem;font-weight:800;letter-spacing:-.035em;
+      .topbar h1 {{margin:0;font-size:2.40rem;font-weight:800;letter-spacing:-.035em;
         line-height:1.0;color:{TEXT};display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}}
       .topbar .hero-grad {{
         background:linear-gradient(92deg,#FFFFFF 0%,#A9C7FF 55%,{CYAN} 100%);
         -webkit-background-clip:text;background-clip:text;
         -webkit-text-fill-color:transparent;color:transparent;}}
-      .topbar .hero-board {{font-weight:600;color:{MUTED};font-size:1.0rem;
+      .topbar .hero-board {{font-weight:600;color:{MUTED};font-size:1.15rem;
         letter-spacing:.01em;text-transform:none;
-        border-left:1px solid rgba(255,255,255,.15);padding-left:12px;}}
-      .topbar .sub {{color:#A7B6D6;font-size:.92rem;margin-top:12px;font-weight:500;
+        border-left:1px solid rgba(255,255,255,.15);padding-left:14px;}}
+      .topbar .sub {{color:#A7B6D6;font-size:1.0rem;margin-top:14px;font-weight:500;
         line-height:1.5;}}
       .topbar .hero-badges {{display:flex;flex-direction:column;gap:7px;align-items:flex-end;
         flex-shrink:0;}}
       /* ── Badges de status ─────────────────────────────────────── */
-      .stat {{display:inline-block;padding:4px 10px;border-radius:999px;font-size:.72rem;
+      .stat {{display:inline-block;padding:5px 12px;border-radius:999px;font-size:.78rem;
         font-weight:700;margin-left:5px;background:rgba(255,255,255,.06);
         border:1px solid rgba(255,255,255,.10);letter-spacing:.02em;}}
       .on  {{color:{GREEN};background:rgba(26,158,26,.12);border-color:rgba(26,158,26,.30);}}
       .off {{color:#64748B;background:rgba(100,116,139,.08);border-color:rgba(100,116,139,.15);}}
       /* ── Seções ───────────────────────────────────────────────── */
-      .sect {{color:{MUTED};font-size:.73rem;font-weight:700;text-transform:uppercase;
-        letter-spacing:.10em;margin:10px 0 2px;border-left:3px solid {VIOLET};padding-left:10px;}}
-      .sect-desc {{color:{MUTED};font-size:.71rem;margin:0 0 5px 13px;line-height:1.40;
+      .sect {{color:{MUTED};font-size:.78rem;font-weight:700;text-transform:uppercase;
+        letter-spacing:.10em;margin:14px 0 4px;border-left:3px solid {VIOLET};padding-left:10px;}}
+      .sect-desc {{color:{MUTED};font-size:.80rem;margin:0 0 8px 13px;line-height:1.45;
         padding-left:10px;border-left:1px solid rgba(255,255,255,.06);}}
       /* ── Pills de reason codes ────────────────────────────────── */
-      .pill {{display:inline-block;padding:3px 10px;border-radius:999px;
-        background:{hex_rgba(CYAN,.14)};color:{CYAN};font-size:.71rem;font-weight:700;
-        margin:2px 5px 2px 0;border:1px solid {hex_rgba(CYAN,.28)};}}
+      .pill {{display:inline-block;padding:4px 12px;border-radius:999px;
+        background:{hex_rgba(CYAN,.14)};color:{CYAN};font-size:.78rem;font-weight:700;
+        margin:2px 6px 2px 0;border:1px solid {hex_rgba(CYAN,.28)};}}
       /* ── Card de resultado do explorador ─────────────────────── */
       .result {{
         background:rgba(0,0,0,0.80);border-radius:12px;padding:18px 22px;
@@ -576,8 +682,8 @@ st.markdown(
       .svc {{font-size:.82rem;padding:4px 0;color:{TEXT};}}
       .sim-pending {{
         background:{hex_rgba(GOLD,.10)};border:1px solid {hex_rgba(GOLD,.28)};
-        color:{GOLD};border-radius:8px;padding:5px 10px;font-size:.76rem;
-        font-weight:600;text-align:center;margin-top:5px;}}
+        color:{GOLD};border-radius:8px;padding:6px 12px;font-size:.82rem;
+        font-weight:600;text-align:center;margin-top:6px;}}
       /* ── Timeline feed ───────────────────────────────────────── */
       .tl-wrap {{
         background:rgba(0,0,0,0.72);border-radius:12px;padding:14px 16px;
@@ -589,21 +695,21 @@ st.markdown(
       .live-dot {{width:7px;height:7px;border-radius:50%;background:{GREEN};
         animation:livepulse 2s infinite;display:inline-block;
         margin-right:6px;vertical-align:middle;}}
-      .tl-item {{display:grid;grid-template-columns:64px 10px 50px 1fr 56px;
-        align-items:center;gap:8px;padding:8px 0;
+      .tl-item {{display:grid;grid-template-columns:72px 12px 56px 1fr 62px;
+        align-items:center;gap:10px;padding:10px 0;
         border-bottom:1px solid rgba(255,255,255,.05);}}
       .tl-item:last-child {{border-bottom:none;}}
-      .tl-time {{color:{TEXT};font-size:10px;font-family:monospace;text-align:right;
+      .tl-time {{color:{TEXT};font-size:12px;font-family:monospace;text-align:right;
         font-weight:600;line-height:1.25;}}
-      .tl-date {{display:block;color:{MUTED};font-size:8px;font-weight:500;}}
-      .tl-dot {{width:9px;height:9px;border-radius:50%;}}
-      .tl-badge {{font-size:7px;font-weight:800;padding:2px 5px;border-radius:4px;
+      .tl-date {{display:block;color:{MUTED};font-size:10px;font-weight:500;}}
+      .tl-dot {{width:11px;height:11px;border-radius:50%;}}
+      .tl-badge {{font-size:8px;font-weight:800;padding:3px 6px;border-radius:4px;
         text-align:center;letter-spacing:.04em;}}
       .tl-body {{min-width:0;}}
-      .tl-name {{font-size:11px;color:{TEXT};font-weight:600;
+      .tl-name {{font-size:13px;color:{TEXT};font-weight:600;
         overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}}
-      .tl-meta {{font-size:8px;color:{MUTED};margin-top:2px;}}
-      .tl-val {{font-size:11px;font-weight:800;text-align:right;}}
+      .tl-meta {{font-size:10px;color:{MUTED};margin-top:2px;}}
+      .tl-val {{font-size:13px;font-weight:800;text-align:right;}}
       /* ── RAG citations ───────────────────────────────────────── */
       .rag-card {{
         background:rgba(0,0,0,0.72);border-radius:10px;
@@ -614,18 +720,18 @@ st.markdown(
       .rag-card:hover {{
         box-shadow:0 2px 6px rgba(0,0,0,.55), 0 6px 18px rgba(26,111,255,.20);
         transform:translateY(-1px);}}
-      .rag-hdr {{display:flex;align-items:center;gap:8px;margin-bottom:7px;}}
-      .rag-src {{font-size:.68rem;font-weight:700;color:{CYAN};
-        background:{hex_rgba(CYAN,.12)};padding:2px 7px;border-radius:4px;
+      .rag-hdr {{display:flex;align-items:center;gap:8px;margin-bottom:8px;}}
+      .rag-src {{font-size:.76rem;font-weight:700;color:{CYAN};
+        background:{hex_rgba(CYAN,.12)};padding:3px 8px;border-radius:4px;
         border:1px solid {hex_rgba(CYAN,.22)};white-space:nowrap;}}
-      .rag-rank {{font-size:.68rem;font-weight:700;color:{MUTED};
-        background:rgba(255,255,255,.05);padding:2px 5px;border-radius:4px;
+      .rag-rank {{font-size:.74rem;font-weight:700;color:{MUTED};
+        background:rgba(255,255,255,.05);padding:3px 6px;border-radius:4px;
         border:1px solid rgba(255,255,255,.08);}}
-      .rag-bar-bg {{flex:1;height:5px;background:rgba(255,255,255,.07);
+      .rag-bar-bg {{flex:1;height:7px;background:rgba(255,255,255,.07);
         border-radius:3px;overflow:hidden;}}
       .rag-bar-fg {{height:100%;border-radius:3px;}}
-      .rag-score {{font-size:.69rem;font-weight:800;min-width:36px;text-align:right;}}
-      .rag-txt {{font-size:.78rem;color:{MUTED};line-height:1.55;}}
+      .rag-score {{font-size:.76rem;font-weight:800;min-width:40px;text-align:right;}}
+      .rag-txt {{font-size:.84rem;color:{MUTED};line-height:1.60;}}
       .rag-highlight {{color:{TEXT};font-weight:600;}}
     </style>
     """,
@@ -698,17 +804,17 @@ def tile(col, label: str, value: str, series, color: str, desc: str = "") -> Non
     ))
     fig.update_layout(
         showlegend=False,
-        height=148,
-        margin={"l": 8, "r": 8, "t": 42, "b": 6},
+        height=190,
+        margin={"l": 8, "r": 8, "t": 52, "b": 8},
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis={"visible": False}, yaxis={"visible": False},
         annotations=[
             {"text": label.upper(), "x": 0.01, "y": 1.0, "xref": "paper", "yref": "paper",
              "showarrow": False, "xanchor": "left", "yanchor": "bottom",
-             "font": {"size": 10, "color": MUTED, "family": "Inter"}},
-            {"text": value, "x": 0.01, "y": 0.52, "xref": "paper", "yref": "paper",
+             "font": {"size": 13, "color": MUTED, "family": "Inter"}},
+            {"text": value, "x": 0.01, "y": 0.50, "xref": "paper", "yref": "paper",
              "showarrow": False, "xanchor": "left",
-             "font": {"size": 28, "color": color, "family": "Inter", "weight": 800}},
+             "font": {"size": 36, "color": color, "family": "Inter", "weight": 800}},
         ],
     )
     col.plotly_chart(fig, config={**NO_BAR, "scrollZoom": False}, **fill())
@@ -717,7 +823,7 @@ def tile(col, label: str, value: str, series, color: str, desc: str = "") -> Non
             f'<div style="margin:-8px 2px 5px;padding:4px 10px 5px;'
             f'background:rgba(0,0,0,0.50);border-radius:0 0 10px 10px;'
             f'border:1px solid rgba(255,255,255,.08);border-top:none">'
-            f'<span style="font-size:.68rem;color:{MUTED};line-height:1.45">{desc}</span>'
+            f'<span style="font-size:.78rem;color:{MUTED};line-height:1.50">{desc}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -763,7 +869,7 @@ def gauge(value: float, title: str, vmax: float, color: str, suffix: str = "",
         delta=delta_cfg,
         number={
             "suffix": suffix,
-            "font": {"size": 36, "color": color, "family": "Inter"},
+            "font": {"size": 44, "color": color, "family": "Inter"},
             "valueformat": ".1f",
         },
         title={
@@ -796,8 +902,8 @@ def gauge(value: float, title: str, vmax: float, color: str, suffix: str = "",
             align="center",
         ))
     fig.update_layout(
-        height=244,
-        margin={"l": 20, "r": 20, "t": 54, "b": 42, "autoexpand": True},
+        height=290,
+        margin={"l": 20, "r": 20, "t": 64, "b": 48, "autoexpand": True},
         paper_bgcolor="rgba(0,0,0,0)",
         font={"color": TEXT, "family": "Inter"},
         hoverlabel={"bgcolor": "rgba(0,0,0,0.90)", "bordercolor": CYAN,
@@ -819,10 +925,9 @@ def style_panel(fig: go.Figure, title: str, height: int = 260,
     fig.update_layout(
         template="plotly_dark", height=height,
         title={"text": f"<b>{title}</b>",
-               "font": {"size": 14, "color": TEXT, "family": "Inter"},
-               "x": 0.01, "xanchor": "left", "pad": {"b": 4}},
-        # t=46 is enough for just the title line; legend is now inside the chart.
-        margin={"l": 14, "r": 14, "t": 46, "b": 28, "autoexpand": True},
+               "font": {"size": 16, "color": TEXT, "family": "Inter"},
+               "x": 0.01, "xanchor": "left", "pad": {"b": 6}},
+        margin={"l": 16, "r": 16, "t": 52, "b": 32, "autoexpand": True},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font={"family": "Inter", "color": TEXT},
@@ -831,7 +936,7 @@ def style_panel(fig: go.Figure, title: str, height: int = 260,
             "orientation": legend_orientation,
             "x": legend_x, "y": legend_y,
             "xanchor": legend_xanchor, "yanchor": legend_yanchor,
-            "font": {"size": 9, "family": "Inter", "color": TEXT},
+            "font": {"size": 11, "family": "Inter", "color": TEXT},
             "bgcolor": "rgba(0,0,0,0.62)",
             "bordercolor": "rgba(255,255,255,.08)", "borderwidth": 1,
             "itemclick": "toggleothers", "itemdoubleclick": "toggle",
@@ -840,7 +945,7 @@ def style_panel(fig: go.Figure, title: str, height: int = 260,
         hoverlabel={
             "bgcolor": "rgba(3,13,36,0.94)",
             "bordercolor": CYAN,
-            "font_size": 12,
+            "font_size": 14,
             "font_family": "Inter",
             "font_color": TEXT,
             "namelength": -1,
@@ -849,9 +954,9 @@ def style_panel(fig: go.Figure, title: str, height: int = 260,
         transition={"duration": 350, "easing": "cubic-in-out"},
     )
     fig.update_xaxes(showgrid=False, zeroline=False, showline=False,
-                     tickfont=dict(size=11, color=MUTED), automargin=True)
+                     tickfont=dict(size=12, color=MUTED), automargin=True)
     fig.update_yaxes(gridcolor="rgba(255,255,255,.07)", zeroline=False, showline=False,
-                     tickfont=dict(size=11, color=MUTED), automargin=True)
+                     tickfont=dict(size=12, color=MUTED), automargin=True)
     return fig
 
 
@@ -902,7 +1007,7 @@ def p_policy_scoreboard(title: str) -> go.Figure:
                      title_text="← pior   |   melhor →",
                      title_font=dict(size=9, color=MUTED))
     fig.update_yaxes(automargin=True, tickfont=dict(size=11, color=TEXT))
-    return style_panel(fig, title, height=300)
+    return style_panel(fig, title, height=380)
 
 
 def recent_decisions(n: int = 15) -> pd.DataFrame:
@@ -951,7 +1056,7 @@ with st.sidebar:
         f'background:linear-gradient(92deg,#FFFFFF 0%,#A9C7FF 60%,{CYAN} 100%);'
         f'-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;'
         f'color:transparent">Adaptive Offers</div>'
-        f'<div style="font-size:.66rem;color:{CYAN};font-weight:700;letter-spacing:.16em;'
+        f'<div style="font-size:.72rem;color:{CYAN};font-weight:700;letter-spacing:.16em;'
         f'text-transform:uppercase;margin-top:3px">FIAP 7MLET · Grupo 64</div>'
         f'</div></div>',
         unsafe_allow_html=True,
@@ -991,21 +1096,21 @@ with st.sidebar:
     seed    = st.session_state["sim_seed"]
 
     st.markdown(
-        f'<div style="display:flex;gap:8px;margin:4px 0 2px">'
+        f'<div style="display:flex;gap:8px;margin:6px 0 2px">'
         f'<div style="flex:1;background:rgba(255,255,255,.03);'
-        f'border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:9px 8px;'
+        f'border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:11px 10px;'
         f'text-align:center">'
-        f'<div style="font-size:1.08rem;font-weight:800;color:{CYAN};line-height:1">'
+        f'<div style="font-size:1.20rem;font-weight:800;color:{CYAN};line-height:1">'
         f'{horizon:,}</div>'
-        f'<div style="font-size:.60rem;color:{MUTED};text-transform:uppercase;'
-        f'letter-spacing:.10em;margin-top:3px">rounds</div></div>'
+        f'<div style="font-size:.66rem;color:{MUTED};text-transform:uppercase;'
+        f'letter-spacing:.10em;margin-top:4px">rounds</div></div>'
         f'<div style="flex:1;background:rgba(255,255,255,.03);'
-        f'border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:9px 8px;'
+        f'border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:11px 10px;'
         f'text-align:center">'
-        f'<div style="font-size:1.08rem;font-weight:800;color:{GOLD};line-height:1">'
+        f'<div style="font-size:1.20rem;font-weight:800;color:{GOLD};line-height:1">'
         f'{seed}</div>'
-        f'<div style="font-size:.60rem;color:{MUTED};text-transform:uppercase;'
-        f'letter-spacing:.10em;margin-top:3px">seed</div></div>'
+        f'<div style="font-size:.66rem;color:{MUTED};text-transform:uppercase;'
+        f'letter-spacing:.10em;margin-top:4px">seed</div></div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -1084,32 +1189,32 @@ with st.sidebar:
         st.markdown(
             f'<div style="border-left:3px solid {_col};border-radius:0 12px 12px 0;'
             f'background:linear-gradient(90deg,{hex_rgba(_col,.08)} 0%,rgba(0,0,0,0) 100%);'
-            f'padding:8px 10px;margin:5px 0;border:1px solid {hex_rgba(_col,.18)};'
+            f'padding:10px 12px;margin:6px 0;border:1px solid {hex_rgba(_col,.18)};'
             f'border-left:3px solid {_col}">'
-            f'<div style="display:flex;align-items:center;margin-bottom:6px">'
-            f'  <div style="width:7px;height:7px;border-radius:50%;background:{_col};'
-            f'  flex-shrink:0;margin-right:6px;box-shadow:0 0 4px {_col}"></div>'
-            f'  <span style="font-size:.82rem;font-weight:700;color:{TEXT}">{_lbl}</span>'
+            f'<div style="display:flex;align-items:center;margin-bottom:7px">'
+            f'  <div style="width:9px;height:9px;border-radius:50%;background:{_col};'
+            f'  flex-shrink:0;margin-right:7px;box-shadow:0 0 4px {_col}"></div>'
+            f'  <span style="font-size:.90rem;font-weight:700;color:{TEXT}">{_lbl}</span>'
             f'  {_badge}'
-            f'  <span style="margin-left:auto;font-size:9px;color:{_col};'
+            f'  <span style="margin-left:auto;font-size:11px;color:{_col};'
             f'  font-weight:700">{_stars}</span>'
             f'</div>'
-            f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px">'
+            f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">'
             f'  <div style="background:rgba(255,255,255,.04);border-radius:6px;'
-            f'  padding:4px;text-align:center">'
-            f'    <div style="font-size:10px;font-weight:800;color:{RED}">'
+            f'  padding:5px;text-align:center">'
+            f'    <div style="font-size:12px;font-weight:800;color:{RED}">'
             f'    {_regret:.1f}%</div>'
-            f'    <div style="font-size:7px;color:{MUTED}">regret</div></div>'
+            f'    <div style="font-size:8px;color:{MUTED}">regret</div></div>'
             f'  <div style="background:rgba(255,255,255,.04);border-radius:6px;'
-            f'  padding:4px;text-align:center">'
-            f'    <div style="font-size:10px;font-weight:800;color:{GREEN}">'
+            f'  padding:5px;text-align:center">'
+            f'    <div style="font-size:12px;font-weight:800;color:{GREEN}">'
             f'    +{_lift:.0f}%</div>'
-            f'    <div style="font-size:7px;color:{MUTED}">lift</div></div>'
+            f'    <div style="font-size:8px;color:{MUTED}">lift</div></div>'
             f'  <div style="background:rgba(255,255,255,.04);border-radius:6px;'
-            f'  padding:4px;text-align:center">'
-            f'    <div style="font-size:10px;font-weight:800;color:{CYAN}">'
+            f'  padding:5px;text-align:center">'
+            f'    <div style="font-size:12px;font-weight:800;color:{CYAN}">'
             f'    {_conv:.1f}%</div>'
-            f'    <div style="font-size:7px;color:{MUTED}">conv</div></div>'
+            f'    <div style="font-size:8px;color:{MUTED}">conv</div></div>'
             f'</div></div>',
             unsafe_allow_html=True,
         )
@@ -1174,7 +1279,7 @@ tile(k4, "Lift vs baseline", f"+{best.get('lift_vs_baseline_pct', 0):.0f}%", lif
 # --------------------------------------------------------------------------- #
 # Dense panel grid (New Relic style) — compact builders
 # --------------------------------------------------------------------------- #
-GRID_H = 250
+GRID_H = 340
 PLABELS = [POLICY_LABEL.get(p, p) for p in sdf["policy"]]
 PCOLORS = [POLICY_COLORS.get(p, VIOLET) for p in sdf["policy"]]
 
@@ -1210,13 +1315,13 @@ def p_lollipop(value_col: str, title: str, money: bool = False,
         x=values, y=labels, mode="markers+text",
         marker=dict(size=15, color=colors, line=dict(color="white", width=1.8)),
         text=txt, textposition="middle right",
-        textfont=dict(size=10, color=TEXT, family="Inter"),
+        textfont=dict(size=12, color=TEXT, family="Inter"),
         hovertemplate="<b>%{y}</b><br>Valor: <b>%{text}</b><extra></extra>",
         hoverlabel=dict(bgcolor="rgba(0,0,0,0.90)", bordercolor=CYAN,
-                        font_size=12, font_family="Inter"),
+                        font_size=13, font_family="Inter"),
     ))
     fig.update_xaxes(range=[0, x_max], showticklabels=False, automargin=True)
-    fig.update_yaxes(automargin=True, tickfont=dict(size=11, color=TEXT))
+    fig.update_yaxes(automargin=True, tickfont=dict(size=12, color=TEXT))
     return style_panel(fig, title, height=GRID_H + 20)
 
 
@@ -1230,14 +1335,14 @@ def p_lollipop_v(x, y, title: str, color: str) -> go.Figure:
                       line=dict(color=hex_rgba(color, 0.35), width=2, dash="dot"))
     fig.add_trace(go.Scatter(
         x=x_l, y=y_l, mode="markers+text",
-        marker=dict(size=13, color=color, line=dict(color="white", width=1.8)),
+        marker=dict(size=15, color=color, line=dict(color="white", width=2)),
         text=[f"{v:.1%}" for v in y_l], textposition="top center",
-        textfont=dict(size=10, color=TEXT, family="Inter"),
+        textfont=dict(size=12, color=TEXT, family="Inter"),
         hovertemplate="<b>%{x}</b><br>Taxa: <b>%{text}</b><extra></extra>",
         hoverlabel=dict(bgcolor="rgba(0,0,0,0.90)", bordercolor=color,
-                        font_size=12, font_family="Inter"),
+                        font_size=13, font_family="Inter"),
     ))
-    fig.update_xaxes(automargin=True, tickfont=dict(size=9, color=TEXT),
+    fig.update_xaxes(automargin=True, tickfont=dict(size=11, color=TEXT),
                      tickangle=-20)
     fig.update_yaxes(tickformat=".0%", range=[0, max_y * 1.45], showgrid=False, zeroline=False,
                      automargin=True)
@@ -1255,17 +1360,17 @@ def p_arms_bar(labels, values, title: str, colors) -> go.Figure:
                     opacity=[0.72 + 0.28 * (i / max(len(_v) - 1, 1)) for i in range(len(_v))]),
         text=[f"{pc:.1f}%" for pc in pct],
         textposition="inside", insidetextanchor="middle",
-        textfont=dict(size=11, color="white", family="Inter"),
+        textfont=dict(size=13, color="white", family="Inter"),
         hovertemplate=(
             "<b>%{y}</b><br>"
             "Pulls totais: <b>%{x:,}</b><br>"
             "Participação: <b>%{text}</b><extra></extra>"
         ),
         hoverlabel=dict(bgcolor="rgba(0,0,0,0.90)", bordercolor=CYAN,
-                        font_size=12, font_family="Inter"),
+                        font_size=13, font_family="Inter"),
     ))
     fig.update_xaxes(showticklabels=False, automargin=True)
-    fig.update_yaxes(automargin=True, tickfont=dict(size=10, color=TEXT))
+    fig.update_yaxes(automargin=True, tickfont=dict(size=12, color=TEXT))
     return style_panel(fig, title, height=GRID_H + 20)
 
 
@@ -1290,10 +1395,10 @@ def p_bar_cat(x, y, title: str, color: str) -> go.Figure:
         text=[f"{v:.1%}" for v in vals],
         textposition="outside",
         cliponaxis=False,
-        textfont=dict(size=12, color=TEXT, family="Inter", weight=700),
+        textfont=dict(size=14, color=TEXT, family="Inter", weight=700),
         hovertemplate="<b>%{y}</b><br>Taxa de conversão: <b>%{text}</b><extra></extra>",
         hoverlabel=dict(bgcolor="rgba(0,0,0,0.90)", bordercolor=color,
-                        font_size=12, font_family="Inter"),
+                        font_size=13, font_family="Inter"),
     ))
     max_v = max(vals) if vals else 1
     fig.update_xaxes(range=[0, max_v * 1.45], tickformat=".0%",
@@ -1317,14 +1422,14 @@ def p_heatmap_corr(df: pd.DataFrame, title: str) -> go.Figure:
         zmid=0, zmin=-1, zmax=1,
         text=[[f"{v:.2f}" for v in row] for row in corr.values],
         texttemplate="%{text}",
-        textfont=dict(size=9, family="Inter"),
+        textfont=dict(size=12, family="Inter"),
         hovertemplate="%{y} × %{x}<br>r = %{z:.2f}<extra></extra>",
-        colorbar=dict(thickness=10, len=0.85,
-                      tickfont=dict(size=9, color=MUTED), tickformat=".1f",
+        colorbar=dict(thickness=12, len=0.85,
+                      tickfont=dict(size=11, color=MUTED), tickformat=".1f",
                       bgcolor="rgba(0,0,0,0)", borderwidth=0),
     ))
-    fig.update_xaxes(tickangle=-35, automargin=True, tickfont=dict(size=9, color=MUTED))
-    fig.update_yaxes(automargin=True, tickfont=dict(size=9, color=MUTED))
+    fig.update_xaxes(tickangle=-35, automargin=True, tickfont=dict(size=11, color=MUTED))
+    fig.update_yaxes(automargin=True, tickfont=dict(size=11, color=MUTED))
     return style_panel(fig, title, height=GRID_H)
 
 
@@ -1366,7 +1471,7 @@ def p_lift_curve(title: str) -> go.Figure:
         fig.add_trace(go.Scatter(
             x=idx, y=lift[idx], mode="lines",
             name=POLICY_LABEL.get(name, name),
-            line=dict(color=col, width=3.0 if is_best else 1.4,
+            line=dict(color=col, width=3.5 if is_best else 2.0,
                       dash="solid" if is_best else "dot",
                       shape="spline", smoothing=0.5),
             opacity=1.0 if is_best else 0.6,
@@ -1474,8 +1579,8 @@ def p_stopping_criterion(title: str) -> go.Figure:
             borderpad=5,
         )
 
-    fig.update_yaxes(title_text="log₁₀(e-value)", title_font=dict(size=9, color=MUTED),
-                     tickfont=dict(size=9, color=MUTED))
+    fig.update_yaxes(title_text="log₁₀(e-value)", title_font=dict(size=11, color=MUTED),
+                     tickfont=dict(size=11, color=MUTED))
     return style_panel(fig, title, height=GRID_H + 30)
 
 
@@ -1565,24 +1670,24 @@ def p_policy_heatmap(title: str) -> go.Figure:
         colorscale=[[0.0, PANEL2], [0.45, VIOLET], [1.0, CYAN]],
         zmin=0, zmax=100, showscale=False,
         text=text_mat, texttemplate="%{text}",
-        textfont=dict(size=11, color="white", family="Inter"),
+        textfont=dict(size=13, color="white", family="Inter"),
         customdata=hover_mat,
         hovertemplate="%{customdata}<extra></extra>",
         xgap=4, ygap=4,
     ))
-    fig.update_xaxes(tickfont=dict(size=11, color=TEXT, family="Inter"), tickangle=-30,
+    fig.update_xaxes(tickfont=dict(size=12, color=TEXT, family="Inter"), tickangle=-30,
                      side="top", automargin=True)
-    fig.update_yaxes(tickfont=dict(size=11, color=TEXT), automargin=True)
+    fig.update_yaxes(tickfont=dict(size=12, color=TEXT), automargin=True)
     fig.update_layout(
-        height=GRID_H + 80,
-        margin=dict(l=12, r=12, t=80, b=12, autoexpand=True),
+        height=GRID_H + 100,
+        margin=dict(l=14, r=14, t=86, b=14, autoexpand=True),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter", color=TEXT),
-        title=dict(text=title, font=dict(size=13, color=TEXT), x=0.01, xanchor="left",
+        title=dict(text=title, font=dict(size=15, color=TEXT), x=0.01, xanchor="left",
                    pad=dict(b=6)),
         hoverlabel=dict(bgcolor="rgba(0,0,0,0.90)", bordercolor=CYAN,
-                        font_size=12, font_family="Inter", font_color=TEXT),
+                        font_size=14, font_family="Inter", font_color=TEXT),
     )
     return fig
 
@@ -1591,19 +1696,19 @@ def p_stat(col, title: str, rows: list[tuple[str, str]], height: int | None = GR
     h_style = f"height:{height}px;" if height is not None else ""
     items = "".join(
         f'<div style="display:flex;justify-content:space-between;align-items:center;'
-        f'padding:8px 0;border-bottom:1px solid {GRID};gap:8px" '
+        f'padding:9px 0;border-bottom:1px solid {GRID};gap:8px" '
         f'title="{lab}">'
-        f'<span style="color:{MUTED};font-size:.81rem;flex-shrink:0">{lab}</span>'
-        f'<span style="font-weight:700;color:{TEXT};font-size:.85rem;text-align:right;'
+        f'<span style="color:{MUTED};font-size:.88rem;flex-shrink:0">{lab}</span>'
+        f'<span style="font-weight:700;color:{TEXT};font-size:.92rem;text-align:right;'
         f'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{val}</span>'
         f'</div>' for lab, val in rows)
     col.markdown(
         f'<div style="background:rgba(0,0,0,0.72);backdrop-filter:blur(12px);'
         f'border-radius:12px;border:none;'
-        f'padding:14px 16px;{h_style}'
+        f'padding:16px 18px;{h_style}'
         f'box-shadow:0 1px 3px rgba(0,0,0,.55),0 4px 14px rgba(0,0,0,.38);">'
-        f'<div style="color:{TEXT};font-weight:700;font-size:12px;margin-bottom:7px;'
-        f'padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.07)">{title}</div>'
+        f'<div style="color:{TEXT};font-weight:700;font-size:14px;margin-bottom:8px;'
+        f'padding-bottom:7px;border-bottom:1px solid rgba(255,255,255,.07)">{title}</div>'
         f'{items}</div>', unsafe_allow_html=True)
 
 
@@ -1713,7 +1818,7 @@ def p_timeseries(series_fn, title, *, smooth=False, pct=False, money=False,
             opacity=1.0 if is_best else 0.62,
             hovertemplate=f"<b>{pre}%{{y{yfmt}}}</b><extra>{POLICY_LABEL.get(name, name)}</extra>",
         ))
-    fig.update_xaxes(title_text="rounds →", title_font=dict(size=9, color=MUTED))
+    fig.update_xaxes(title_text="rounds →", title_font=dict(size=11, color=MUTED))
     if pct:
         fig.update_yaxes(tickformat=".0%")
     lx, lxa = (0.02, "left") if legend_left else (0.98, "right")
@@ -1819,7 +1924,7 @@ def p_montecarlo(title: str, n_paths: int = 240) -> go.Figure:
         x=x[sel], y=q50[sel], mode="lines", name="mediana",
         line=dict(color=CYAN, width=2.6, shape="spline", smoothing=0.5),
         hovertemplate="round %{x}<br>mediana R$ %{y:,.0f}<extra></extra>"))
-    fig.update_xaxes(title_text="rounds →", title_font=dict(size=9, color=MUTED))
+    fig.update_xaxes(title_text="rounds →", title_font=dict(size=11, color=MUTED))
     return style_panel(fig, title, height=GRID_H + 40, legend_x=0.02, legend_xanchor="left")
 
 
@@ -1842,7 +1947,7 @@ def p_trend(title: str) -> go.Figure:
         x=xw, y=trend, mode="lines", name=f"tendência {'↗' if up else '↘'}",
         line=dict(color=GREEN if up else RED, width=3, dash="dash"),
         hovertemplate="tendência R$ %{y:,.1f}<extra></extra>"))
-    fig.update_xaxes(title_text="rounds →", title_font=dict(size=9, color=MUTED))
+    fig.update_xaxes(title_text="rounds →", title_font=dict(size=11, color=MUTED))
     return style_panel(fig, title, height=GRID_H + 40, legend_x=0.02, legend_xanchor="left")
 
 
@@ -1912,11 +2017,11 @@ with stop_stat:
             f'<div style="background:rgba(0,0,0,0.72);border-radius:12px;'
             f'border:1px solid rgba(255,255,255,.05);padding:18px 16px 16px;'
             f'box-shadow:0 1px 3px rgba(0,0,0,.60),0 4px 16px rgba(0,0,0,.45);">'
-            f'<div style="font-size:.68rem;color:{MUTED};font-weight:700;'
+            f'<div style="font-size:.72rem;color:{MUTED};font-weight:700;'
             f'letter-spacing:.08em;margin-bottom:6px">EARLY STOPPING</div>'
-            f'<div style="font-size:2.2rem;font-weight:900;color:{_card_color};'
+            f'<div style="font-size:2.6rem;font-weight:900;color:{_card_color};'
             f'line-height:1.1;margin-bottom:4px">{_save_pct:.0f}%</div>'
-            f'<div style="font-size:.75rem;color:{TEXT};margin-bottom:12px">'
+            f'<div style="font-size:.80rem;color:{TEXT};margin-bottom:12px">'
             f'de rodadas economizadas</div>'
             f'<hr style="border-color:rgba(255,255,255,.06);margin:8px 0">'
             f'<div style="font-size:.70rem;color:{MUTED};line-height:1.55">'
@@ -1936,15 +2041,15 @@ with stop_stat:
             _cr_txt = str(_cr2) if _cr2 is not None else "—"
             _rows_html += (
                 f'<div style="display:flex;justify-content:space-between;'
-                f'padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
-                f'<span style="color:{_col2};font-size:.68rem;font-weight:700">{_lbl2}</span>'
-                f'<span style="color:{TEXT};font-size:.68rem">t={_cr_txt}</span></div>'
+                f'padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+                f'<span style="color:{_col2};font-size:.76rem;font-weight:700">{_lbl2}</span>'
+                f'<span style="color:{TEXT};font-size:.76rem">t={_cr_txt}</span></div>'
             )
         st.markdown(
             f'<div style="background:rgba(0,0,0,0.72);border-radius:12px;'
             f'border:1px solid rgba(255,255,255,.05);padding:12px 16px;margin-top:8px;'
             f'box-shadow:0 1px 3px rgba(0,0,0,.60),0 4px 16px rgba(0,0,0,.45);">'
-            f'<div style="font-size:.68rem;color:{MUTED};font-weight:700;'
+            f'<div style="font-size:.74rem;color:{MUTED};font-weight:700;'
             f'letter-spacing:.08em;margin-bottom:8px">CONVERGÊNCIA POR POLÍTICA</div>'
             f'{_rows_html}</div>',
             unsafe_allow_html=True,
@@ -2163,57 +2268,57 @@ def _feed_panel():
                 f'border-radius:12px;padding:16px 15px;height:100%;'
                 f'box-shadow:0 1px 3px rgba(0,0,0,.55),0 4px 14px rgba(0,0,0,.38);">'
                 # header
-                f'<div style="color:{TEXT};font-weight:700;font-size:13px;'
+                f'<div style="color:{TEXT};font-weight:700;font-size:15px;'
                 f'margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid {GRID}">'
                 f'📊 Resumo do feed</div>'
                 # total
                 f'<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid {GRID}">'
-                f'  <div style="color:{MUTED};font-size:.68rem;font-weight:700;'
+                f'  <div style="color:{MUTED};font-size:.74rem;font-weight:700;'
                 f'  letter-spacing:.06em;margin-bottom:4px">TOTAL NO LOG</div>'
-                f'  <div style="color:{TEXT};font-size:1.8rem;font-weight:900;line-height:1">'
+                f'  <div style="color:{TEXT};font-size:2.0rem;font-weight:900;line-height:1">'
                 f'  {total_count:,}</div>'
-                f'  <div style="color:{MUTED};font-size:.68rem;margin-top:2px">'
+                f'  <div style="color:{MUTED};font-size:.74rem;margin-top:2px">'
                 f'  decisões auditáveis registradas</div>'
                 f'</div>'
                 # explore ratio
                 f'<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid {GRID}">'
-                f'  <div style="color:{MUTED};font-size:.68rem;font-weight:700;'
+                f'  <div style="color:{MUTED};font-size:.74rem;font-weight:700;'
                 f'  letter-spacing:.06em;margin-bottom:6px">EXPLORAÇÃO vs EXPLOTAÇÃO</div>'
                 f'  <div style="display:flex;gap:10px;margin-bottom:7px">'
                 f'    <div style="text-align:center;flex:1">'
-                f'      <div style="color:{CYAN};font-size:1.1rem;font-weight:800">{n_e}</div>'
-                f'      <div style="color:{CYAN};font-size:.68rem">🔍 exploração</div>'
+                f'      <div style="color:{CYAN};font-size:1.2rem;font-weight:800">{n_e}</div>'
+                f'      <div style="color:{CYAN};font-size:.74rem">🔍 exploração</div>'
                 f'    </div>'
                 f'    <div style="text-align:center;flex:1">'
-                f'      <div style="color:{GREEN};font-size:1.1rem;font-weight:800">{n_ex}</div>'
-                f'      <div style="color:{GREEN};font-size:.68rem">🎯 explotação</div>'
+                f'      <div style="color:{GREEN};font-size:1.2rem;font-weight:800">{n_ex}</div>'
+                f'      <div style="color:{GREEN};font-size:.74rem">🎯 explotação</div>'
                 f'    </div>'
                 f'  </div>'
-                f'  <div style="height:8px;background:rgba(255,255,255,.07);'
+                f'  <div style="height:10px;background:rgba(255,255,255,.07);'
                 f'  border-radius:4px;overflow:hidden">'
                 f'    <div style="width:{ep:.0f}%;height:100%;background:{CYAN};'
                 f'    border-radius:4px"></div>'
                 f'  </div>'
                 f'  <div style="display:flex;justify-content:space-between;margin-top:4px">'
-                f'    <span style="color:{CYAN};font-size:.68rem">{ep:.0f}%</span>'
-                f'    <span style="color:{GREEN};font-size:.68rem">{100-ep:.0f}%</span>'
+                f'    <span style="color:{CYAN};font-size:.74rem">{ep:.0f}%</span>'
+                f'    <span style="color:{GREEN};font-size:.74rem">{100-ep:.0f}%</span>'
                 f'  </div>'
                 f'</div>'
                 # avg value
                 f'<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid {GRID}">'
-                f'  <div style="color:{MUTED};font-size:.68rem;font-weight:700;'
+                f'  <div style="color:{MUTED};font-size:.74rem;font-weight:700;'
                 f'  letter-spacing:.06em;margin-bottom:4px">VALOR MÉDIO / DECISÃO</div>'
-                f'  <div style="color:{GREEN};font-size:1.3rem;font-weight:800">'
+                f'  <div style="color:{GREEN};font-size:1.5rem;font-weight:800">'
                 f'  R$ {avg_v:.1f}</div>'
-                f'  <div style="color:{MUTED};font-size:.68rem">P(conv) × margem</div>'
+                f'  <div style="color:{MUTED};font-size:.74rem">P(conv) × margem</div>'
                 f'</div>'
                 # top arm
                 f'<div>'
-                f'  <div style="color:{MUTED};font-size:.68rem;font-weight:700;'
+                f'  <div style="color:{MUTED};font-size:.74rem;font-weight:700;'
                 f'  letter-spacing:.06em;margin-bottom:5px">OFERTA MAIS SELECIONADA</div>'
-                f'  <div style="color:{GOLD};font-size:.85rem;font-weight:700;line-height:1.3">'
+                f'  <div style="color:{GOLD};font-size:.92rem;font-weight:700;line-height:1.3">'
                 f'  {str(top)[:30]}</div>'
-                f'  <div style="color:{MUTED};font-size:.68rem;margin-top:3px">'
+                f'  <div style="color:{MUTED};font-size:.74rem;margin-top:3px">'
                 f'  {top_count}× nesta amostra</div>'
                 f'</div>'
                 f'</div>',
@@ -2323,11 +2428,11 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
     # ── CHARTS ───────────────────────────────────────────────────────────────
     def _div(label: str) -> None:
         st.markdown(
-            f'<div style="display:flex;align-items:center;gap:11px;margin:26px 0 16px">'
+            f'<div style="display:flex;align-items:center;gap:11px;margin:30px 0 18px">'
             f'<span style="width:5px;height:18px;border-radius:3px;flex-shrink:0;'
             f'background:linear-gradient(180deg,{VIOLET},{CYAN});'
             f'box-shadow:0 0 9px {hex_rgba(CYAN,.55)}"></span>'
-            f'<span style="color:{TEXT};font-size:.82rem;font-weight:800;letter-spacing:.06em">'
+            f'<span style="color:{TEXT};font-size:.90rem;font-weight:800;letter-spacing:.06em">'
             f'{label}</span>'
             f'<div style="height:1px;flex:1;'
             f'background:linear-gradient(90deg,{hex_rgba(CYAN,.30)},rgba(255,255,255,0))"></div>'
@@ -2436,20 +2541,20 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
             f'<div style="background:rgba(0,0,0,0.72);backdrop-filter:blur(12px);'
             f'border-radius:12px;padding:14px 14px 8px;'
             f'box-shadow:0 1px 3px rgba(0,0,0,.55),0 4px 14px rgba(0,0,0,.38);">'
-            f'<div style="color:{TEXT};font-weight:700;font-size:13px;margin-bottom:4px">'
+            f'<div style="color:{TEXT};font-weight:700;font-size:15px;margin-bottom:6px">'
             f'🧾 Todas as ofertas elegíveis</div>'
-            f'<div style="color:{MUTED};font-size:.70rem;margin-bottom:10px">'
+            f'<div style="color:{MUTED};font-size:.78rem;margin-bottom:12px">'
             f'P(conv) = conversão estimada pelo bandit contextual · '
             f'<span style="color:{GREEN};font-weight:700">verde = selecionada</span></div>'
             f'<table style="width:100%;border-collapse:collapse">'
             f'<thead><tr style="border-bottom:1px solid {GRID}">'
-            f'<th style="padding:4px 10px 8px;font-size:.68rem;color:{MUTED};text-align:left;'
+            f'<th style="padding:6px 10px 10px;font-size:.74rem;color:{MUTED};text-align:left;'
             f'font-weight:700;letter-spacing:.06em">OFERTA</th>'
-            f'<th style="padding:4px 8px 8px;font-size:.68rem;color:{MUTED};text-align:right;'
+            f'<th style="padding:6px 8px 10px;font-size:.74rem;color:{MUTED};text-align:right;'
             f'font-weight:700;letter-spacing:.06em">P(conv)</th>'
-            f'<th style="padding:4px 8px 8px;font-size:.68rem;color:{MUTED};text-align:right;'
+            f'<th style="padding:6px 8px 10px;font-size:.74rem;color:{MUTED};text-align:right;'
             f'font-weight:700;letter-spacing:.06em">MARGEM</th>'
-            f'<th style="padding:4px 8px 8px;font-size:.68rem;color:{MUTED};text-align:right;'
+            f'<th style="padding:6px 8px 10px;font-size:.74rem;color:{MUTED};text-align:right;'
             f'font-weight:700;letter-spacing:.06em">VALOR ESP.</th>'
             f'</tr></thead>'
             f'<tbody>{row_html}</tbody>'
@@ -2463,30 +2568,30 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
             f'<div style="background:rgba(0,0,0,0.72);backdrop-filter:blur(12px);'
             f'border-radius:12px;padding:16px;margin-bottom:0;'
             f'box-shadow:0 1px 3px rgba(0,0,0,.55),0 4px 14px rgba(0,0,0,.38);">'
-            f'<div style="color:{TEXT};font-weight:700;font-size:13px;margin-bottom:10px;'
-            f'padding-bottom:7px;border-bottom:1px solid rgba(255,255,255,.07)">'
+            f'<div style="color:{TEXT};font-weight:700;font-size:15px;margin-bottom:12px;'
+            f'padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)">'
             f'⚖️ Fórmula de valor esperado</div>'
             f'<div style="display:flex;align-items:center;justify-content:space-around;'
-            f'text-align:center;gap:4px">'
+            f'text-align:center;gap:6px">'
             f'<div>'
-            f'  <div style="font-size:1.7rem;font-weight:900;color:{CYAN};line-height:1">'
+            f'  <div style="font-size:2.0rem;font-weight:900;color:{CYAN};line-height:1">'
             f'  {p_conv:.1%}</div>'
-            f'  <div style="color:{MUTED};font-size:.70rem;margin-top:4px">P(conv)</div>'
-            f'  <div style="color:{MUTED};font-size:.64rem">prob. conversão</div>'
+            f'  <div style="color:{MUTED};font-size:.78rem;margin-top:5px">P(conv)</div>'
+            f'  <div style="color:{MUTED};font-size:.70rem">prob. conversão</div>'
             f'</div>'
-            f'<div style="font-size:1.6rem;color:{MUTED};font-weight:200;line-height:1">×</div>'
+            f'<div style="font-size:1.8rem;color:{MUTED};font-weight:200;line-height:1">×</div>'
             f'<div>'
-            f'  <div style="font-size:1.7rem;font-weight:900;color:{GOLD};line-height:1">'
+            f'  <div style="font-size:2.0rem;font-weight:900;color:{GOLD};line-height:1">'
             f'  R${p_margin:.0f}</div>'
-            f'  <div style="color:{MUTED};font-size:.70rem;margin-top:4px">Margem</div>'
-            f'  <div style="color:{MUTED};font-size:.64rem">valor da oferta</div>'
+            f'  <div style="color:{MUTED};font-size:.78rem;margin-top:5px">Margem</div>'
+            f'  <div style="color:{MUTED};font-size:.70rem">valor da oferta</div>'
             f'</div>'
-            f'<div style="font-size:1.6rem;color:{MUTED};font-weight:200;line-height:1">=</div>'
+            f'<div style="font-size:1.8rem;color:{MUTED};font-weight:200;line-height:1">=</div>'
             f'<div>'
-            f'  <div style="font-size:1.7rem;font-weight:900;color:{GREEN};line-height:1">'
+            f'  <div style="font-size:2.0rem;font-weight:900;color:{GREEN};line-height:1">'
             f'  R${p_conv*p_margin:.1f}</div>'
-            f'  <div style="color:{MUTED};font-size:.70rem;margin-top:4px">Valor esp.</div>'
-            f'  <div style="color:{MUTED};font-size:.64rem">reward esperado</div>'
+            f'  <div style="color:{MUTED};font-size:.78rem;margin-top:5px">Valor esp.</div>'
+            f'  <div style="color:{MUTED};font-size:.70rem">reward esperado</div>'
             f'</div>'
             f'</div></div>',
             unsafe_allow_html=True,
@@ -2518,13 +2623,13 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
         st.markdown(
             f'<div style="background:{hex_rgba(mode_color, 0.10)};backdrop-filter:blur(6px);'
             f'border:2px solid {hex_rgba(mode_color, 0.50)};'
-            f'border-radius:14px;padding:14px 16px;margin-top:10px;text-align:center;'
+            f'border-radius:14px;padding:16px 18px;margin-top:10px;text-align:center;'
             f'box-shadow:0 6px 20px {hex_rgba(mode_color,0.22)}">'
-            f'<div style="font-size:1.15rem;font-weight:900;color:{mode_color};'
+            f'<div style="font-size:1.35rem;font-weight:900;color:{mode_color};'
             f'letter-spacing:-.01em;line-height:1">{mode_label}</div>'
-            f'<div style="color:{MUTED};font-size:.74rem;margin-top:5px;font-weight:500">'
+            f'<div style="color:{MUTED};font-size:.82rem;margin-top:6px;font-weight:500">'
             f'{mode_desc}</div>'
-            f'<div style="font-size:.68rem;color:{hex_rgba(mode_color,.65)};margin-top:6px;'
+            f'<div style="font-size:.74rem;color:{hex_rgba(mode_color,.65)};margin-top:7px;'
             f'font-weight:600;letter-spacing:.04em">'
             f'{"exploração reduz incerteza do modelo" if rec.explored else "explotação maximiza reward esperado"}'
             f'</div>'
@@ -2537,18 +2642,18 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
 
     # Reason codes — faixa de mini-cards em GRID responsivo (largura total).
     reason_items = "".join(
-        f'<div style="display:flex;align-items:flex-start;gap:11px;'
-        f'padding:11px 13px;border-radius:0 10px 10px 0;'
+        f'<div style="display:flex;align-items:flex-start;gap:13px;'
+        f'padding:13px 15px;border-radius:0 10px 10px 0;'
         f'background:linear-gradient(90deg,{hex_rgba(CYAN,.08)},rgba(0,0,0,0));'
         f'border:1px solid rgba(255,255,255,.06);border-left:3px solid {CYAN}">'
-        f'<span style="flex-shrink:0;width:22px;height:22px;border-radius:7px;'
-        f'background:{hex_rgba(CYAN,.16)};color:{CYAN};font-size:.72rem;font-weight:800;'
+        f'<span style="flex-shrink:0;width:26px;height:26px;border-radius:7px;'
+        f'background:{hex_rgba(CYAN,.16)};color:{CYAN};font-size:.80rem;font-weight:800;'
         f'display:flex;align-items:center;justify-content:center;'
         f'border:1px solid {hex_rgba(CYAN,.30)}">{i}</span>'
         f'<div style="min-width:0">'
-        f'<div style="color:{CYAN};font-size:.75rem;font-weight:800;'
-        f'letter-spacing:.03em;font-family:monospace;margin-bottom:3px">{r["code"]}</div>'
-        f'<div style="color:{MUTED};font-size:.76rem;line-height:1.45">'
+        f'<div style="color:{CYAN};font-size:.82rem;font-weight:800;'
+        f'letter-spacing:.03em;font-family:monospace;margin-bottom:4px">{r["code"]}</div>'
+        f'<div style="color:{MUTED};font-size:.82rem;line-height:1.50">'
         f'{r["description"]}</div>'
         f'</div>'
         f'</div>'
@@ -2561,8 +2666,8 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
         f'<div style="display:flex;align-items:center;justify-content:space-between;'
         f'flex-wrap:wrap;gap:8px;margin-bottom:12px;'
         f'padding-bottom:9px;border-bottom:1px solid rgba(255,255,255,.07)">'
-        f'<span style="color:{TEXT};font-weight:800;font-size:14px">🧠 Por que esta decisão</span>'
-        f'<span style="color:{MUTED};font-size:.71rem">'
+        f'<span style="color:{TEXT};font-weight:800;font-size:16px">🧠 Por que esta decisão</span>'
+        f'<span style="color:{MUTED};font-size:.78rem">'
         f'{len(rec.reasons)} reason codes · política '
         f'<b style="color:{CYAN}">{rec.policy_name}</b></span>'
         f'</div>'
@@ -2586,7 +2691,7 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
     provider_badge = (
         f'<span style="background:{_badge_bg};color:{_badge_color};'
         f'border:1px solid {_badge_border};border-radius:5px;'
-        f'padding:3px 10px;font-size:.70rem;font-weight:700;white-space:nowrap">{_badge_txt}</span>'
+        f'padding:4px 12px;font-size:.78rem;font-weight:700;white-space:nowrap">{_badge_txt}</span>'
     )
     st.markdown(
         f'<div style="background:rgba(0,0,0,0.72);backdrop-filter:blur(12px);'
@@ -2601,15 +2706,16 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
         f'background:linear-gradient(135deg,{hex_rgba(VIOLET,.30)},{hex_rgba(CYAN,.20)});'
         f'border:1px solid {hex_rgba(CYAN,.30)}">🤖</span>'
         f'<div style="flex:1;min-width:0">'
-        f'<div style="color:{TEXT};font-weight:800;font-size:14px;line-height:1.1">'
+        f'<div style="color:{TEXT};font-weight:800;font-size:16px;line-height:1.2">'
         f'Assistente LLM + RAG</div>'
-        f'<div style="color:{MUTED};font-size:.68rem;margin-top:2px">'
-        f'explicação em linguagem natural · grounded nas políticas comerciais</div>'
+        f'<div style="color:{MUTED};font-size:.76rem;margin-top:3px">'
+        f'explicação em linguagem natural · grounded nas políticas comerciais · '
+        f'sem dados sintéticos · baseada exclusivamente nas métricas reais da simulação</div>'
         f'</div>'
         f'{provider_badge}'
         f'</div>'
-        f'<div style="color:{TEXT};font-size:.86rem;line-height:1.8;'
-        f'columns:2;column-gap:34px;column-rule:1px solid rgba(255,255,255,.06)">'
+        f'<div style="color:{TEXT};font-size:.95rem;line-height:1.85;'
+        f'columns:2;column-gap:38px;column-rule:1px solid rgba(255,255,255,.06)">'
         f'{_md2html(exp["answer"])}'
         f'</div>'
         f'</div>',
@@ -2617,14 +2723,15 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
     )
     if exp.get("citations"):
         st.markdown(
-            f'<div style="color:{TEXT};font-weight:700;font-size:13px;margin:18px 0 4px">'
+            f'<div style="color:{TEXT};font-weight:700;font-size:16px;margin:22px 0 6px">'
             f'📄 Citações de política comercial</div>'
-            f'<div style="color:{MUTED};font-size:.73rem;margin-bottom:12px">'
-            f'Chunks da política comercial recuperados por similaridade semântica e injetados no '
+            f'<div style="color:{MUTED};font-size:.80rem;margin-bottom:14px">'
+            f'Chunks da política comercial recuperados por similaridade semântica (TF-IDF) e injetados no '
             f'prompt do LLM. Score indica relevância: '
-            f'<span style="color:{GREEN}">alto (&gt;0.3)</span> · '
-            f'<span style="color:{GOLD}">médio (0.1-0.3)</span> · '
-            f'<span style="color:{MUTED}">baixo (&lt;0.1)</span>.</div>',
+            f'<span style="color:{GREEN}">alta (&gt;0.3)</span> · '
+            f'<span style="color:{GOLD}">média (0.1-0.3)</span> · '
+            f'<span style="color:{MUTED}">baixa (&lt;0.1)</span>. '
+            f'Quanto maior o score, mais o trecho influenciou a explicação.</div>',
             unsafe_allow_html=True,
         )
         rag_html = '<div class="rag-wrap">'
@@ -2649,9 +2756,9 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
                 f'    <div class="rag-bar-fg" style="width:{bar_pct:.0f}%;'
                 f'    background:{bar_color}"></div>'
                 f'  </div>'
-                f'  <span style="font-size:.62rem;font-weight:700;color:{sc_color};'
+                f'  <span style="font-size:.68rem;font-weight:700;color:{sc_color};'
                 f'  background:{hex_rgba(sc_color,.14)};border:1px solid {hex_rgba(sc_color,.30)};'
-                f'  border-radius:4px;padding:1px 6px;text-transform:uppercase;'
+                f'  border-radius:4px;padding:2px 7px;text-transform:uppercase;'
                 f'  letter-spacing:.04em;white-space:nowrap">{rel_lbl}</span>'
                 f'  <span class="rag-score" style="color:{sc_color}">{score:.2f}</span>'
                 f'</div>'
@@ -2673,18 +2780,18 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
             t3.metric("Total", f"{_trace.get('total_ms', 0):.0f} ms",
                       help="Tempo end-to-end da chamada ao Assistant")
             st.markdown(
-                f'<div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap">'
-                f'<span style="font-size:.74rem;background:rgba(255,255,255,.05);'
-                f'border-radius:6px;padding:4px 10px;color:{MUTED}">'
+                f'<div style="display:flex;gap:12px;margin:12px 0;flex-wrap:wrap">'
+                f'<span style="font-size:.80rem;background:rgba(255,255,255,.05);'
+                f'border-radius:6px;padding:5px 12px;color:{MUTED}">'
                 f'<b style="color:{TEXT}">Provider:</b> {_trace.get("provider", exp.get("provider","?"))}</span>'
-                f'<span style="font-size:.74rem;background:rgba(255,255,255,.05);'
-                f'border-radius:6px;padding:4px 10px;color:{MUTED}">'
+                f'<span style="font-size:.80rem;background:rgba(255,255,255,.05);'
+                f'border-radius:6px;padding:5px 12px;color:{MUTED}">'
                 f'<b style="color:{TEXT}">Modelo:</b> {_trace.get("model","—")}</span>'
-                f'<span style="font-size:.74rem;background:rgba(255,255,255,.05);'
-                f'border-radius:6px;padding:4px 10px;color:{MUTED}">'
+                f'<span style="font-size:.80rem;background:rgba(255,255,255,.05);'
+                f'border-radius:6px;padding:5px 12px;color:{MUTED}">'
                 f'<b style="color:{TEXT}">Chunks RAG:</b> {_trace.get("chunks_retrieved",0)}</span>'
-                f'<span style="font-size:.74rem;background:rgba(255,255,255,.05);'
-                f'border-radius:6px;padding:4px 10px;color:{MUTED}">'
+                f'<span style="font-size:.80rem;background:rgba(255,255,255,.05);'
+                f'border-radius:6px;padding:5px 12px;color:{MUTED}">'
                 f'<b style="color:{TEXT}">Query RAG:</b> {_trace.get("rag_query","—")}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -2692,10 +2799,10 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
 
 st.divider()
 st.markdown(
-    f'<div style="text-align:center;color:{MUTED};font-size:.82rem;padding:8px 0 4px">'
+    f'<div style="text-align:center;color:{MUTED};font-size:.90rem;padding:12px 0 6px">'
     f'<b style="color:{TEXT}">Adaptive Offers Platform</b> · © 2026 '
     f'<b style="color:{CYAN}">Dione Braga</b> — Grupo 64 · FIAP Pós-Tech 7MLET'
-    '<br/><span style="font-size:.76rem">Licença MIT · '
+    '<br/><span style="font-size:.82rem">Licença MIT · '
     '<a href="https://github.com/dionebraga/datathon-7mlet-grupo-64" '
     f'style="color:{MUTED};text-decoration:none">github.com/dionebraga/datathon-7mlet-grupo-64</a>'
     '</span></div>', unsafe_allow_html=True)

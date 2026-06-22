@@ -38,18 +38,18 @@ Write-Host "  --------------------------------------------------" -ForegroundCol
 Start-Service-Window "Adaptive Offers - API (8000)"       "adaptive-offers serve"
 Write-Host "  [1/3] API REST       -> http://localhost:8000/docs" -ForegroundColor Green
 
-Start-Service-Window "Adaptive Offers - MLflow (5000)"     "`$env:MLFLOW_ALLOW_FILE_STORE='true'; mlflow ui --backend-store-uri '$root\mlruns' --port 5000"
-Write-Host "  [2/3] MLflow         -> http://localhost:5000" -ForegroundColor Green
+Start-Service-Window "Adaptive Offers - MLflow (5001)"     "`$env:MLFLOW_ALLOW_FILE_STORE='true'; mlflow ui --backend-store-uri file:./mlruns --registry-store-uri file:./mlruns --port 5001"
+Write-Host "  [2/3] MLflow         -> http://localhost:5001" -ForegroundColor Green
 
-Start-Service-Window "Adaptive Offers - Dashboard (8501)"  "streamlit run dashboard\app.py"
-Write-Host "  [3/3] Dashboard BI   -> http://localhost:8501" -ForegroundColor Green
+Start-Service-Window "Adaptive Offers - Dashboard (8503)"  "streamlit run dashboard\app.py --server.port 8503"
+Write-Host "  [3/3] Dashboard BI   -> http://localhost:8503" -ForegroundColor Green
 
 Write-Host "  --------------------------------------------------" -ForegroundColor DarkGray
 Write-Host "  Abrindo o dashboard no navegador em alguns segundos..." -ForegroundColor DarkGray
 
 # Dá tempo do Streamlit/MLflow iniciarem antes de abrir o navegador.
 Start-Sleep -Seconds 8
-Start-Process "http://localhost:8501"
+Start-Process "http://localhost:8503"
 
 Write-Host ""
 Write-Host "  Pronto! Cada servico esta em sua propria janela." -ForegroundColor Magenta

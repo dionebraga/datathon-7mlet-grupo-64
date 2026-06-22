@@ -1,15 +1,16 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Compass, Gift, Loader2, Sparkles, Target } from "lucide-react";
+import { BarChart, Bot, Compass, Gift, Loader2, Percent, Sparkles, Target } from "lucide-react";
 import { useState } from "react";
+import { Bar, BarChart as RechartBar, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Slider } from "@/components/ui/Slider";
 import { Select } from "@/components/ui/Select";
 import { ValueBreakdown, type OfferValue } from "@/components/ValueBreakdown";
 import { api } from "@/lib/api";
-import { brl } from "@/lib/utils";
+import { brl, pct } from "@/lib/utils";
 import type { AssistantAnswer, ContextInput, Decision, Offer } from "@/lib/types";
 
 export function DecisionExplorer({ offers }: { offers: Offer[] }) {
@@ -142,13 +143,34 @@ export function DecisionExplorer({ offers }: { offers: Offer[] }) {
               ))}
             </div>
 
-            {/* value breakdown + reasons */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-              <div className="card p-4 lg:col-span-3">
+            {/* value breakdown + probability + reasons */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-6">
+              <div className="card p-4 lg:col-span-2">
                 <CardTitle icon={<Target className="h-4 w-4 text-primary-soft" />}>
-                  Valor esperado por oferta elegível
+                  Valor esperado por oferta
                 </CardTitle>
                 <ValueBreakdown data={breakdown} />
+              </div>
+              <div className="card p-4 lg:col-span-2">
+                <CardTitle icon={<Percent className="h-4 w-4 text-primary-soft" />}>
+                  P(conversão) por oferta
+                </CardTitle>
+                <ResponsiveContainer width="100%" height={Math.max(180, breakdown.length * 42)}>
+                  <RechartBar data={breakdown} layout="vertical" margin={{ left: 8, right: 28, top: 4, bottom: 4 }}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={150} tick={{ fill: "#a1a1aa", fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                      contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "#ededed" }}
+                      formatter={(v: number) => [pct(v / 100), "probabilidade"]}
+                    />
+                    <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={22}>
+                      {breakdown.map((d, i) => (
+                        <Cell key={i} fill={d.chosen ? "#34d399" : "#0070f3"} fillOpacity={d.chosen ? 1 : 0.6} />
+                      ))}
+                    </Bar>
+                  </RechartBar>
+                </ResponsiveContainer>
               </div>
               <div className="card p-4 lg:col-span-2">
                 <CardTitle icon={<Sparkles className="h-4 w-4 text-primary-soft" />}>Por que esta decisão</CardTitle>
@@ -160,6 +182,45 @@ export function DecisionExplorer({ offers }: { offers: Offer[] }) {
                     </li>
                   ))}
                 </ul>
+                {/* decomposition visual */}
+                {decision.estimates && decision.arm_id && (
+                  <div className="mt-4 rounded-xl border border-border bg-surface2 p-3 text-center text-xs">
+                    <div className="mb-2 text-muted">Valor = P(conv) × Margem</div>
+                    <div className="flex items-center justify-around gap-1">
+                      <div>
+                        <div className="text-lg font-extrabold text-primary-soft">
+                          {((decision.estimates[decision.arm_id] ?? 0) / 100).toFixed(1)}%
+                        </div>
+                        <div className="text-muted">P(conv)</div>
+                      </div>
+                      <span className="text-lg text-muted">×</span>
+                      <div>
+                        <div className="text-lg font-extrabold text-success">
+                          {brl(decision.expected_reward / Math.max(0.01, (decision.estimates[decision.arm_id] ?? 1) / 100))}
+                        </div>
+                        <div className="text-muted">Margem</div>
+                      </div>
+                      <span className="text-lg text-muted">=</span>
+                      <div>
+                        <div className="text-lg font-extrabold text-success">{brl(decision.expected_reward)}</div>
+                        <div className="text-muted">Valor</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* explore/exploit indicator */}
+                <div className={`mt-3 rounded-xl border p-3 text-center ${
+                  decision.explored ? "border-amber/30 bg-amber/10" : "border-success/30 bg-success/10"
+                }`}>
+                  <div className={`text-base font-extrabold ${decision.explored ? "text-amber" : "text-success"}`}>
+                    {decision.explored ? "🔍 Exploração" : "🎯 Explotação"}
+                  </div>
+                  <div className="mt-0.5 text-[0.7rem] text-muted">
+                    {decision.explored
+                      ? "Testando alternativa promissora para aprender"
+                      : "Usando a melhor estimativa atual"}
+                  </div>
+                </div>
               </div>
             </div>
 

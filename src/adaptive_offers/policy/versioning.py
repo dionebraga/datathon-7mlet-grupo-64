@@ -101,3 +101,47 @@ def rollback() -> str | None:
     reg["active"] = previous
     _registry_path().write_text(json.dumps(reg, indent=2), encoding="utf-8")
     return previous
+
+
+def list_versions() -> list[dict[str, Any]]:
+    """Return metadata dicts for all versioned policies saved in artifacts/policies/."""
+    base = get_settings().paths.artifacts / "policies"
+    if not base.exists():
+        return []
+    result = []
+    for meta_file in sorted(base.glob("*/metadata.json")):
+        try:
+            data = json.loads(meta_file.read_text(encoding="utf-8"))
+            result.append({
+                "version": data.get("version", meta_file.parent.name),
+                "policy": data.get("name", "unknown"),
+                "trained_on": data.get("trained_on"),
+                "metrics": data.get("metrics", {}),
+            })
+        except Exception:
+            continue
+    return result
+
+
+def set_active_version(policy: str, version: str) -> None:
+    """Switch the active policy to the given policy/version combination.
+
+    Validates that the version directory exists before promoting.
+    Raises ``FileNotFoundError`` if the version has not been saved yet.
+    """
+    pdir = _policy_dir(version)
+    if not (pdir / "policy.pkl").exists():
+        raise FileNotFoundError(
+            f"Versão '{version}' não encontrada em artifacts/policies/. "
+            "Treine e salve a política antes de ativá-la."
+        )
+    meta_path = pdir / "metadata.json"
+    if meta_path.exists():
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        stored_policy = meta.get("name", "")
+        if stored_policy and stored_policy != policy:
+            raise ValueError(
+                f"Versão '{version}' corresponde à política '{stored_policy}', "
+                f"não '{policy}'."
+            )
+    _set_active(version)

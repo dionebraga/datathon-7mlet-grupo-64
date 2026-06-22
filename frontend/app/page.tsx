@@ -46,13 +46,21 @@ export default function Page() {
 
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <MetricCard icon={Banknote} label="Reward / 1k" value={policy ? brl(m.reward_per_1k ?? 0) : "—"}
-          sub="valor por 1k impressões" color="#3291ff" delay={0.05} />
+          sub="valor por 1k impressões" color="#3291ff" delay={0.05}
+          trend={m.lift_vs_baseline_pct ? `+${m.lift_vs_baseline_pct.toFixed(0)}%` : undefined}
+          trendLabel="vs baseline" trendUp={true} />
         <MetricCard icon={Gauge} label="Regret ratio" value={policy ? pct(m.regret_ratio ?? 0) : "—"}
-          sub="distância do ótimo" color="#ef4444" delay={0.1} />
+          sub="distância do ótimo" color="#ef4444" delay={0.1}
+          trend={m.regret_ratio < 0.1 ? "±baixo" : "±alto"}
+          trendLabel={m.regret_ratio < 0.1 ? "bom" : "atenção"} trendUp={m.regret_ratio < 0.1} />
         <MetricCard icon={Activity} label="Conversão" value={policy ? pct(m.conversion_rate ?? 0) : "—"}
-          sub="conversões / impressões" color="#34d399" delay={0.15} />
+          sub="conversões / impressões" color="#34d399" delay={0.15}
+          trend={m.conversion_rate > 0.08 ? ">8%" : "<8%"}
+          trendLabel={m.conversion_rate > 0.08 ? "acima da média" : "abaixo da média"} trendUp={m.conversion_rate > 0.08} />
         <MetricCard icon={Search} label="Exploração" value={policy ? pct(m.exploration_rate ?? 0) : "—"}
-          sub="decisões exploratórias" color="#f5a623" delay={0.2} />
+          sub="decisões exploratórias" color="#f5a623" delay={0.2}
+          trend={m.exploration_rate > 0.1 ? ">10%" : "<10%"}
+          trendLabel={m.exploration_rate > 0.1 ? "boa exploração" : "conservadora"} trendUp={m.exploration_rate > 0.1} />
       </section>
 
       <DecisionExplorer offers={offers} />
