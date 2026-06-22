@@ -50,6 +50,7 @@ class DecisionRecord:
     reason_codes: list[str]
     reasons: list[dict[str, str]] = field(default_factory=list)
     estimates: dict[str, float] = field(default_factory=dict)
+    scores: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -121,6 +122,7 @@ class DecisionService:
             reason_codes=codes,
             reasons=enrich(codes),
             estimates={k: round(float(v), 4) for k, v in decision.estimates.items()},
+            scores={k: round(float(v), 4) for k, v in (decision.scores or {}).items()},
         )
         if log:
             self._audit(record)

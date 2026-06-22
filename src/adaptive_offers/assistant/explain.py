@@ -65,6 +65,17 @@ _GUARDRAIL_LABELS: dict[str, str] = {
     "CONTROL_FALLBACK":          "⚠ Nenhuma oferta elegível — controle (no_offer) aplicado",
 }
 
+_ARM_LABELS: dict[str, str] = {
+    "OFF_CC_CASHBACK": "Cartão Cashback", "OFF_LOAN_PREAPP": "Empréstimo Pré-aprovado",
+    "OFF_TD_PREMIUM": "Depósito a Prazo Premium", "OFF_FUND_INTRO": "Fundo de Investimento Intro",
+    "OFF_INSURANCE": "Seguro Bundle", "OFF_NONE": "Sem Oferta (controle)",
+}
+
+
+def _arm_label(arm_id: str) -> str:
+    """Human-readable name for an offer id (falls back to a cleaned id)."""
+    return _ARM_LABELS.get(arm_id, str(arm_id).replace("OFF_", "").replace("_", " ").title())
+
 
 class Assistant:
     """Combines policy RAG + an LLM client into grounded explanations."""
@@ -113,11 +124,26 @@ class Assistant:
                 f"- {_first_sentences(c.text, 2)} (fonte: {c.source}, score {c.score:.2f})"
                 for c in chunks[:3]
             ) or "—"
+            # Concrete per-arm ranking (real margin-weighted scores) for the LLM to cite.
+            scores = decision.get("scores") or {}
+            ranking = "—"
+            if isinstance(scores, dict) and len(scores) >= 2:
+                ranked = sorted(scores.items(), key=lambda kv: float(kv[1]), reverse=True)
+                ranking = "\n".join(
+                    f"  {i + 1}º {_arm_label(k)}: score {float(v):.2f}"
+                    + (" ← escolhido" if k == decision.get("arm_id") else "")
+                    for i, (k, v) in enumerate(ranked)
+                )
+            estimates = decision.get("estimates") or {}
+            p_chosen = estimates.get(decision.get("arm_id"))
+            p_line = f"\nP(conversão | contexto) do braço escolhido: {p_chosen:.1%}" if p_chosen else ""
             grounding = (
                 f"Oferta recomendada: **{arm_name}**\n"
                 f"Política: `{decision.get('policy_name')}@{decision.get('policy_version')}` "
                 f"(modo: {mode})\n"
-                f"Valor esperado: R$ {decision.get('expected_reward')}\n"
+                f"Valor esperado (P × margem): R$ {decision.get('expected_reward')}"
+                f"{p_line}\n"
+                f"Ranking dos braços elegíveis por score ponderado por margem:\n{ranking}\n"
                 f"Reason codes: {reason_h}\n"
                 f"Contexto comercial (RAG):\n{rag_ctx}"
             )
@@ -128,15 +154,21 @@ class Assistant:
                 "jamais invente números ou afirmações."
             )
             prompt_used = (
-                "Escreva um PARECER TÉCNICO da decisão de oferta abaixo, em markdown, "
-                "com EXATAMENTE estas seções (cada uma começando com '### '):\n"
-                "### Decisão — 1 frase: oferta escolhida e seu valor esperado.\n"
-                "### Justificativa técnica — 2-3 frases: por que a política bandit selecionou "
-                "este braço (estimativa contextual de P(conversão), trade-off "
+                "Escreva um PARECER TÉCNICO da decisão de oferta abaixo, em markdown. "
+                "Use EXATAMENTE estes 5 títulos curtos (copie cada um literalmente, sem "
+                "acrescentar a descrição ao título), cada um numa linha iniciando por '### ', "
+                "seguido do conteúdo pedido:\n\n"
+                "1) `### Decisão` — 1 frase: oferta escolhida e seu valor esperado.\n"
+                "2) `### Justificativa técnica` — 2-3 frases: por que a política bandit "
+                "selecionou este braço (P(conversão) contextual, trade-off "
                 "exploração/explotação, papel da incerteza no score).\n"
-                "### Risco & governança — 1-2 frases: guardrails de elegibilidade/suitability "
-                "aplicados e o que monitorar (drift, fairness de exposição).\n"
-                "### Leitura comercial — 1 frase conectando a decisão à política comercial (RAG).\n\n"
+                "3) `### Por que venceu os concorrentes` — 1-2 frases citando os NÚMEROS reais "
+                "do ranking fornecido: nomeie o 2º colocado e a diferença de score ponderado "
+                "para o escolhido. Jamais invente valores; use apenas o ranking dado.\n"
+                "4) `### Risco & governança` — 1-2 frases: guardrails de "
+                "elegibilidade/suitability e o que monitorar (drift, fairness de exposição).\n"
+                "5) `### Leitura comercial` — 1 frase conectando a decisão à política comercial "
+                "(RAG).\n\n"
                 "Use SOMENTE os fatos abaixo:\n\n" + grounding
             )
             raw = self.llm.complete(prompt_used, system=sys_prompt, grounding=grounding)
@@ -227,33 +259,42 @@ class Assistant:
         policy   = decision.get("policy_name", "?")
         version  = decision.get("policy_version", "v1")
         reward   = float(decision.get("expected_reward", 0))
+        expec_p  = decision.get("expected_p", None)
+        margin   = decision.get("margin", None)
 
-        # Mode
+        # Mode with concrete explanation tied to algorithm mechanics
         if explored:
             mode_label  = "EXPLORAÇÃO"
             mode_detail = (
-                "O bandit selecionou este braço para reduzir incerteza epistêmica — "
-                "a estimativa de valor ainda não é suficientemente confiante. "
-                "UCB/Thompson regulam a taxa de exploração automaticamente, sem intervenção humana."
+                "O bandit selecionou este braço para reduzir incerteza sobre seu "
+                "potencial — a estimativa de P(conversão) ainda tem variância alta. "
+                f"A penalidade UCB (termo α·√(xᵀA⁻¹x)) ou a amostragem da posterior "
+                f"de Thompson superou o valor estimado dos braços consagrados. "
+                "Sem essa exploração periódica, o modelo nunca descobriria ofertas "
+                "potencialmente melhores para este perfil."
             )
         else:
             mode_label  = "EXPLOTAÇÃO"
             mode_detail = (
-                "O modelo convergiu para este braço como melhor estimativa de valor esperado "
-                "dado o vetor de contexto deste cliente. "
-                "Após aprendizado suficiente, o algoritmo direciona a maior parte das decisões "
-                "para o braço de máximo P(conv) × margem."
+                "O modelo selecionou o braço de maior valor esperado dado o contexto "
+                "deste cliente, após aprendizado acumulado das rodadas anteriores. "
+                "A incerteza sobre este braço já é baixa o suficiente para que a "
+                "penalidade UCB não altere o ranking — o algoritmo prioriza reward. "
+                "A taxa de explotação aumenta naturalmente com o número de rodadas, "
+                "conforme as estimativas convergem."
             )
 
         # Policy ML explanation
         ml_explain = _POLICY_EXPLAIN.get(policy, f"Política {policy} aplicada.")
 
-        # Guardrails
+        # Guardrails with concrete detail
         guardrails = [_GUARDRAIL_LABELS[c] for c in codes if c in _GUARDRAIL_LABELS]
         if not guardrails:
             guardrails = ["• Nenhum guardrail específico registrado para esta decisão."]
         else:
             guardrails = [f"• {g}" for g in guardrails]
+        # Add policy version info
+        guardrails.append(f"• Versão da política: `{policy}@{version}`")
 
         # RAG — smarter extraction: search for the selected arm specifically
         rag_lines = []
@@ -262,13 +303,10 @@ class Assistant:
             raw = _strip_md(chunk.text).strip()
             if not raw or len(raw) < 30:
                 continue
-            # Skip chunks starting mid-word (broken by character-limit chunking)
             if raw[0].islower():
                 continue
-            # Prefer chunks that mention the chosen arm
             mentions_arm = any(kw in raw.lower() for kw in arm_keywords)
             if mentions_arm:
-                # Extract the sentence(s) about this arm specifically
                 sentences = [s.strip() for s in re.split(r"\.\s+", raw) if s.strip()]
                 arm_sentences = [
                     s for s in sentences
@@ -286,21 +324,63 @@ class Assistant:
         if not rag_lines:
             rag_lines = ["• Nenhuma política comercial específica recuperada com score relevante."]
 
-        # Financial interpretation
-        if reward > 50:
-            fin_comment = "Oferta de alto valor esperado — adequada para maximização de receita por contato."
-        elif reward > 20:
-            fin_comment = "Valor esperado moderado — equilibra volume e margem neste perfil de cliente."
+        # Financial interpretation with concrete thresholds
+        margin_val = margin if margin is not None else 0
+        prob_val = expec_p if expec_p is not None else None
+        if prob_val is not None:
+            prob_line = f"P(conversão | contexto) ≈ **{prob_val:.1%}**"
         else:
-            fin_comment = "Valor esperado baixo — possível perfil de difícil conversão ou baixa margem."
+            prob_line = f"P(conversão | contexto) ≈ **{reward / max(margin_val, 1):.1%}** (inferida)"
+        
+        if prob_val is not None and margin_val:
+            value_math = f"**{prob_val:.1%} × R$ {margin_val:.0f} = R$ {reward:.1f}**"
+        else:
+            value_math = f"**R$ {reward:.1f}**"
+        tier = ("alto valor esperado" if reward > 50
+                else "valor esperado moderado" if reward > 20 else "valor esperado baixo")
+        fin_comment = (
+            f"Oferta de **{tier}**. O valor é a recompensa esperada por impressão, "
+            f"computada como P(conversão) × margem = {value_math}. "
+            "Não é necessariamente a oferta de maior conversão isolada, e sim a de maior "
+            "**valor** — o ranqueamento pondera a probabilidade pela margem de cada produto."
+        )
+
+        # Concrete competitive comparison using the policy's own margin-weighted scores
+        scores = decision.get("scores") or {}
+        compare_lines: list[str] = []
+        if isinstance(scores, dict) and len(scores) >= 2:
+            ranked = sorted(scores.items(), key=lambda kv: float(kv[1]), reverse=True)
+            chosen_score = float(scores.get(arm_id, ranked[0][1]))
+            runner = next(((k, float(v)) for k, v in ranked if k != arm_id), None)
+            if runner is not None:
+                runner_id, runner_score = runner
+                gap = chosen_score - runner_score
+                rel = (gap / runner_score * 100.0) if runner_score else 0.0
+                compare_lines.append(
+                    f"• Entre **{len(scores)} braços elegíveis**, venceu o 2º colocado "
+                    f"(**{_arm_label(runner_id)}**) por **{gap:+.2f}** no score ponderado "
+                    f"(**{chosen_score:.2f}** vs {runner_score:.2f}, {rel:+.0f}%)."
+                )
+                last_id, last_score = ranked[-1]
+                if last_id not in (arm_id, runner_id):
+                    compare_lines.append(
+                        f"• Último colocado: **{_arm_label(last_id)}** (score {float(last_score):.2f}) "
+                        "— penalizado pela margem baixa ou pela menor probabilidade no contexto."
+                    )
+        if not compare_lines:
+            compare_lines = ["• Comparação entre braços indisponível nesta decisão."]
 
         # Compose professional structured response
         parts = [
             f"**{arm_name}** · `{policy}@{version}` · Modo: **{mode_label}**",
-            f"Valor esperado: **R$ {reward:.1f}** = P(conversão | x) × margem_a",
+            f"Valor esperado: **R$ {reward:.1f}**",
+            f"Fórmula: **E[reward] = P(conv | x) × margem_a** · {prob_line}",
             "---",
-            f"### Análise financeira",
+            "### Análise financeira",
             fin_comment,
+            "",
+            "### Por que este braço venceu",
+            *compare_lines,
             "",
             f"### Algoritmo — {policy.upper()}",
             ml_explain,
@@ -327,6 +407,8 @@ class Assistant:
         best_reward = best.get("cumulative_reward", 0)
         best_regret = best.get("regret_ratio", 0)
         best_conv   = best.get("conversion_rate", 0)
+        best_lift   = best.get("lift_vs_baseline_pct", 0)
+        best_expl   = best.get("exploration_rate", 0)
         worst_policy = worst.get("policy", "?")
 
         ml_explain = _POLICY_EXPLAIN.get(best_policy, f"Política {best_policy}.")
@@ -345,19 +427,38 @@ class Assistant:
                 f"conv={conv:.1%} · exploração={expl:.1%} · lift={lift:+.0f}%{star}"
             )
 
+        # Compute concrete insights from actual metrics
+        if best_reward > 0:
+            lift_vs_worst = ((best_reward - worst.get('cumulative_reward', 0)) / best_reward) * 100
+        else:
+            lift_vs_worst = 0
+
         parts = [
             f"**Melhor política:** {best_policy.upper()} · "
-            f"Reward={best_reward:,.0f} · Regret={best_regret:.1%} · Conv={best_conv:.1%}",
+            f"Reward=R$ {best_reward:,.0f} · Regret={best_regret:.1%} · "
+            f"Conv={best_conv:.1%} · Lift=+{best_lift:.0f}% vs baseline · "
+            f"Exploração={best_expl:.1%}",
             "",
             f"**Modelo vencedor:** {ml_explain}",
+            "",
+            f"**Vantagem quantitativa:** a {best_policy.upper()} superou a pior "
+            f"política ({worst_policy}) em **{lift_vs_worst:.0f}%** de reward acumulado. "
+            f"Comparada à baseline greedy, o ganho (lift) foi de **+{best_lift:.0f}%** — "
+            f"comprovando que o aprendizado contextual agrega valor real vs um "
+            f"selecionador determinístico sem exploração.",
             "",
             "**Ranking completo:**",
             *lines,
             "",
-            "**Interpretação:** A política de melhor desempenho maximizou receita "
-            "aprendendo a selecionar ofertas de maior P(conversão) × margem para cada "
-            "perfil de cliente. O trade-off exploração/explotação é gerenciado "
-            "automaticamente pelo algoritmo — sem intervenção humana por decisão.",
+            "**Interpretação:** O bandit contextual aprendeu a associar perfis de "
+            "cliente (idade, euribor3m, campanha anterior, canal de contato) às ofertas "
+            "de maior probabilidade de conversão. Políticas com exploração estruturada "
+            "(UCB, Thompson) superam a greedy porque descobrem braços melhores ao longo "
+            "do tempo, enquanto a baseline fica presa em máximos locais. "
+            "O trade-off exploração/explotação é gerenciado automaticamente pelo "
+            f"algoritmo — a taxa de exploração de {best_expl:.1%} indica um "
+            f"balanceamento {'agressivo' if best_expl > 0.15 else 'conservador'} "
+            f"entre testar novas ofertas e explorar as melhores.",
         ]
         return "\n".join(parts)
 
