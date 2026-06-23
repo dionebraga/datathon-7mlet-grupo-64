@@ -38,7 +38,7 @@ def _print_comparison(rows: list[dict]) -> None:
         for r in rows:
             table.add_row(
                 r["policy"], f"{r['cumulative_reward']:,.0f}", f"{r['regret_ratio']:.1%}",
-                f"{r['conversion_rate']:.1%}", f"+{r.get('lift_vs_baseline_pct', 0):.1f}%",
+                f"{r['conversion_rate']:.1%}", f"{r.get('lift_vs_baseline_pct', 0):+.1f}%",
             )
         Console().print(table)
     except Exception:  # pragma: no cover - Rich is optional
@@ -97,7 +97,8 @@ def synth_generate(seed: int | None) -> None:
 # --------------------------------------------------------------------------- #
 @cli.command("train")
 @click.option("--policy", "policy_name", default="linucb",
-              type=click.Choice(["baseline", "thompson", "nilos_ucb", "linucb", "neural"]))
+              type=click.Choice(["baseline", "thompson", "nilos_ucb", "linucb",
+                                  "lin_thompson", "neural"]))
 @click.option("--version", default="v1", show_default=True)
 @click.option("--horizon", default=12_000, show_default=True)
 @click.option("--seed", default=None, type=int)
@@ -121,6 +122,45 @@ def train(policy_name: str, version: str, horizon: int, seed: int | None, compar
         bundle = ensure_bundle(proc, seed=seed)
         rows = metrics_matrix(proc, bundle, horizon=horizon)
         _print_comparison(rows)
+
+
+@cli.command("train-all")
+@click.option("--version", default="v1", show_default=True)
+@click.option("--horizon", default=12_000, show_default=True)
+@click.option("--seed", default=None, type=int)
+@click.option("--register", "register_name", default="linucb", show_default=True,
+              type=click.Choice(["baseline", "thompson", "nilos_ucb", "linucb", "lin_thompson"]),
+              help="Política registrada como ativa ao final do lote.")
+def train_all(version: str, horizon: int, seed: int | None, register_name: str) -> None:
+    """Treina TODAS as políticas em sequência, cada uma como um run no MLflow.
+
+    Popula o experimento `adaptive-offers` com runs comparáveis (Etapa 3) e deixa
+    a política escolhida (`--register`, padrão LinUCB) como a ativa ao final.
+    """
+    from adaptive_offers.bandits.registry import POLICIES
+    from adaptive_offers.bootstrap import ensure_bundle, ensure_data, train_and_register
+    from adaptive_offers.evaluation.offline_eval import metrics_matrix
+    from adaptive_offers.tracking import log_metrics, log_params, mlflow_run
+
+    # Treina a política escolhida POR ÚLTIMO para que ela termine como a ativa
+    # (cada train_and_register sobrescreve a versão registrada).
+    order = [p for p in POLICIES if p != register_name] + [register_name]
+    click.echo(f"Treinando {len(order)} políticas (horizon={horizon}) → MLflow…")
+    for name in order:
+        meta = train_and_register(policy_name=name, version=version, horizon=horizon, seed=seed)
+        with mlflow_run(run_name=f"{name}-{version}",
+                        tags={"stage": "3", "policy": name, "batch": "train-all"}):
+            log_params({"policy": name, "version": version, "horizon": horizon})
+            log_metrics(meta.metrics)
+        click.echo(f"  [ok] {name:<14} treinado e logado no MLflow")
+
+    click.echo(f"[ok] política ATIVA: {register_name}@{version}")
+    proc = ensure_data(seed=seed)
+    bundle = ensure_bundle(proc, seed=seed)
+    _print_comparison(metrics_matrix(proc, bundle, horizon=horizon))
+    click.echo("\nVer no MLflow:  "
+               "$env:MLFLOW_ALLOW_FILE_STORE='true'; "
+               "mlflow ui --backend-store-uri file:./mlruns --port 5000")
 
 
 # --------------------------------------------------------------------------- #

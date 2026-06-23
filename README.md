@@ -219,7 +219,8 @@ ANTHROPIC_MODEL=claude-opus-4-8           # qualidade máxima (ou claude-haiku-4
 |---|:---:|---|
 | `adaptive-offers data build` | 1 | Base processada, registro de fonte/versão/licença, decisão de vazamento |
 | `adaptive-offers synth generate` | 2 | `offer_catalog`, `offer_events`, `delayed_rewards` + schema |
-| `adaptive-offers train --horizon 20000 --seed 42` | 3 | Baseline + Thompson + Nilos-UCB + LinUCB, métricas em MLflow |
+| `adaptive-offers train --horizon 20000 --seed 42` | 3 | Treina **uma** política e registra como ativa, métricas em MLflow |
+| `adaptive-offers train-all --horizon 20000` | 3 | Treina **as 5 políticas** (1 run cada no MLflow) p/ comparação; registra LinUCB como ativa |
 | `adaptive-offers evaluate --horizon 20000 --seed 42` | 4 | Métricas reproduzíveis, golden set, fairness de exposição |
 | `adaptive-offers decide` | 5 | Decisão com braço, reason codes, versão da política, log auditável |
 | `adaptive-offers serve` | 5 | API com contrato documentado e tratamento de erro |
