@@ -2536,7 +2536,7 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
         nba_block = (
             f'<div style="margin-top:14px;padding-top:14px;border-top:1px solid {GRID}">'
             f'  <div style="color:{MUTED};font-size:.70rem;font-weight:700;letter-spacing:.07em;'
-            f'  margin-bottom:7px">📨 MENSAGEM SERVIDA · <span style="color:{CYAN}">'
+            f'  margin-bottom:7px">📨 PRÉVIA DA MENSAGEM AO CLIENTE · <span style="color:{CYAN}">'
             f'template governado</span></div>'
             f'  <div style="background:{hex_rgba(CYAN,.06)};border-left:3px solid {hex_rgba(CYAN,.5)};'
             f'  border-radius:8px;padding:11px 13px">'
@@ -2544,8 +2544,10 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
             f'    {rec.nba_headline}</div>'
             f'    <div style="color:{MUTED};font-size:.84rem;line-height:1.45">{rec.nba_message}</div>'
             f'    <div style="margin-top:9px"><span style="background:{GREEN};color:#fff;'
-            f'    font-size:.78rem;font-weight:800;padding:5px 13px;border-radius:7px">'
-            f'    {rec.nba_cta} →</span></div>'
+            f'    font-size:.78rem;font-weight:800;padding:5px 13px;border-radius:7px;'
+            f'    cursor:default">{rec.nba_cta} →</span>'
+            f'    <span style="color:{MUTED};font-size:.70rem;margin-left:9px;font-style:italic">'
+            f'    botão que o cliente vê no e-mail/app — prévia, não é um controle do painel</span></div>'
             f'  </div>'
             f'</div>'
         )
