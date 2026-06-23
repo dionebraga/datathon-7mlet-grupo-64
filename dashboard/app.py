@@ -228,7 +228,7 @@ def _hero_bg_layer() -> str:
     try:
         import numpy as np
         from PIL import Image, ImageDraw, ImageFont
-        from scipy.ndimage import binary_closing, binary_dilation, binary_erosion
+        from scipy.ndimage import binary_closing, binary_erosion
         from scipy.ndimage import label as _ndlabel
         from skimage.morphology import skeletonize
 
@@ -251,25 +251,26 @@ def _hero_bg_layer() -> str:
         W, H = gimg.size
         arr  = np.asarray(gimg, dtype=np.float32)
 
-        # Threshold: top ~10% of pixels = the bright glowing tube only
-        # p90 of luminance = 24; threshold > 26 catches tube, excludes background
-        raw_mask  = arr > 26
-        # Small closing: connect adjacent bright pixels on the same strand
-        core_mask = binary_closing(raw_mask, structure=np.ones((9, 9)))
+        # Solid tube body straight from luminance. The navy *hollow* of the tube
+        # is still clearly brighter than the pure-black background, so a low
+        # threshold captures the bright rim AND the dark interior in one shot —
+        # formulas then fill the whole tube (not only the glowing rim) without
+        # bleeding into the black background between the coils.
+        solid_mask = binary_closing(arr > 12, structure=np.ones((5, 5)))
 
         # Keep only the largest connected component (= the caracol itself)
-        labeled, num = _ndlabel(core_mask)
+        labeled, num = _ndlabel(solid_mask)
         if num > 0:
             sizes = [(labeled == i).sum() for i in range(1, num + 1)]
-            core_mask = (labeled == (sizes.index(max(sizes)) + 1))
+            solid_mask = (labeled == (sizes.index(max(sizes)) + 1))
 
         # Two masks with distinct jobs:
-        #  • place_mask (dilated)  — generous, used to PLACE text along the tube;
-        #  • clip_mask  (eroded)   — tight, used to CLIP the final render so no
-        #    formula pixel ever shows outside the actual glowing tube.
-        place_mask = binary_dilation(core_mask, structure=np.ones((5, 5)))
-        clip_mask  = binary_erosion(core_mask, structure=np.ones((3, 3)))
-        tube_mask  = place_mask  # placement/skeleton use the generous mask
+        #  • place_mask (solid)   — fills the whole tube body, used to PLACE text;
+        #  • clip_mask  (eroded)  — slightly tighter, used to CLIP the final render
+        #    so no formula pixel ever shows outside the tube silhouette.
+        place_mask = solid_mask
+        clip_mask  = binary_erosion(solid_mask, structure=np.ones((3, 3)))
+        tube_mask  = place_mask
 
         # Skeletonize to get centerline for path-following text
         sk = set(zip(*[a.tolist() for a in np.where(skeletonize(tube_mask))][::-1]))
@@ -367,7 +368,7 @@ def _hero_bg_layer() -> str:
                     if x + cw > se - 1:
                         break
                     draw.text((x, row - fs_sml // 2), ch, font=font_sml,
-                              fill=(205, 225, 255, 34))
+                              fill=(205, 225, 255, 44))
                     x += cw + 1
 
         # ═══════════════════════════════════════════════════════════════
@@ -406,7 +407,7 @@ def _hero_bg_layer() -> str:
                 ph_h  = fs_big + pad * 2 + 4
                 pi    = Image.new("RGBA", (max(ph_w, 10), max(ph_h, 10)), (0, 0, 0, 0))
                 ImageDraw.Draw(pi).text((pad, pad + 2), phrase, font=font_big,
-                                        fill=(225, 240, 255, 72))
+                                        fill=(225, 240, 255, 82))
                 pr = pi.rotate(ang_d, expand=True, resample=Image.BICUBIC)
 
                 mx, my = pp[idx]
