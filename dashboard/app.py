@@ -1842,6 +1842,59 @@ def p_timeseries(series_fn, title, *, smooth=False, pct=False, money=False,
                        legend_x=lx, legend_xanchor=lxa, hovermode="x unified")
 
 
+def p_regret_convergence(title, *, height=None) -> go.Figure:
+    """Regret instantâneo com ênfase de **convergência** — estilo deliberadamente
+    distinto do gráfico de exploração (linhas): a política ativa vira **área**
+    decaindo até a linha do oráculo (regret 0), as demais ficam como referência
+    tênue. Suavização mais forte para revelar a tendência sob o ruído."""
+    fig = go.Figure()
+    best_name = best["policy"]
+    # Políticas de referência primeiro (tênues, ao fundo).
+    for name, res in results.items():
+        if name == best_name:
+            continue
+        y = np.asarray(res.instant_regret, dtype=float)
+        if len(y) > 4:
+            w = max(1, len(y) // 16)
+            y = pd.Series(y).rolling(w, min_periods=1).mean().to_numpy()
+        n = len(y)
+        if n == 0:
+            continue
+        idx = np.linspace(0, n - 1, min(120, n)).astype(int)
+        col = POLICY_COLORS.get(name, VIOLET)
+        fig.add_trace(go.Scatter(
+            x=idx + 1, y=y[idx], mode="lines",
+            name=POLICY_LABEL.get(name, name), legendgroup=name,
+            line=dict(color=col, width=1.3, shape="spline", smoothing=0.7, dash="dot"),
+            opacity=0.5,
+            hovertemplate=f"<b>R$ %{{y:,.1f}}</b><extra>{POLICY_LABEL.get(name, name)}</extra>",
+        ))
+    # Política ativa: área cheia decaindo até zero (convergência).
+    res = results[best_name]
+    y = np.asarray(res.instant_regret, dtype=float)
+    if len(y) > 4:
+        w = max(1, len(y) // 16)
+        y = pd.Series(y).rolling(w, min_periods=1).mean().to_numpy()
+    n = len(y)
+    idx = np.linspace(0, n - 1, min(120, n)).astype(int)
+    col = POLICY_COLORS.get(best_name, VIOLET)
+    fig.add_trace(go.Scatter(
+        x=idx + 1, y=y[idx], mode="lines",
+        name=POLICY_LABEL.get(best_name, best_name), legendgroup=best_name,
+        line=dict(color=col, width=3.4, shape="spline", smoothing=0.7),
+        fill="tozeroy", fillcolor=hex_rgba(col, 0.18),
+        hovertemplate=f"<b>R$ %{{y:,.1f}}</b><extra>{POLICY_LABEL.get(best_name, best_name)} (ativa)</extra>",
+    ))
+    # Linha do oráculo (regret 0) — alvo da convergência.
+    fig.add_hline(y=0, line=dict(color=GREEN, width=1.6, dash="dash"))
+    fig.add_annotation(x=n, y=0, text="oráculo · regret 0", showarrow=False,
+                       xanchor="right", yanchor="bottom",
+                       font=dict(size=11, color=GREEN))
+    fig.update_xaxes(title_text="rounds →", title_font=dict(size=11, color=MUTED))
+    return style_panel(fig, title, height=height or (GRID_H + 36),
+                       legend_x=0.98, legend_xanchor="right", hovermode="x unified")
+
+
 st.markdown('<div class="sect">📊 Resultados do experimento</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="sect-desc">Comparação das 5 políticas no mesmo cenário/seed. '
@@ -1904,8 +1957,7 @@ c5.plotly_chart(
                  "🔭 Exploração → explotação ao longo do tempo", smooth=True, pct=True),
     config=NO_BAR, **fill())
 c6.plotly_chart(
-    p_timeseries(lambda r: r.instant_regret,
-                 "📉 Regret instantâneo (suavizado) — convergência", smooth=True, money=True),
+    p_regret_convergence("📉 Regret instantâneo — convergência ao oráculo"),
     config=NO_BAR, **fill())
 st.markdown(
     '<div class="sect-desc" style="margin-top:6px">'
