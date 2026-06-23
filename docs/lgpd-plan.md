@@ -17,16 +17,26 @@
   protegidos**. `duration` e colunas pós-contato são removidas (Stage 1).
 - **Não** são usados: identificadores diretos, renda, patrimônio, gênero, raça,
   dados reais de cliente.
-- Idade/profissão/estado civil/escolaridade são tratados como features comuns e
-  **não** como atributos protegidos de decisão; seu efeito é auditado em fairness.
+- Idade/profissão/estado civil/escolaridade são **registrados como atributos
+  protegidos** (monitorados em fairness) e **nunca usados como driver isolado de
+  decisão** nem para exclusão; idade entra só como sinal de *suitability*.
 
 ## 3. Mapeamento de identificadores e atributos protegidos
+A fonte única de verdade dos atributos protegidos é
+`src/adaptive_offers/responsible.py` (`PROTECTED_ATTRIBUTES`), importada pela
+camada de fairness e pelo serviço de decisão — garantindo um mapeamento único e
+versionado.
+
 | Categoria | Campos | Tratamento |
 |---|---|---|
 | Identificador | `client_event_id` | Surrogate **pseudonimizado**; sem PII real |
-| Proxies sensíveis | `age`, `job`, `marital`, `education` | Não protegidos de decisão; monitorados em fairness |
+| Atributos protegidos | `age`, `job`, `marital`, `education` | Registrados em `responsible.py`; **monitorados** em fairness (exposição **e valor**); **nunca** drivers isolados nem usados para exclusão |
 | Proibidos | renda, patrimônio, gênero, raça, ID real | **Não coletados / não usados** |
 | Contexto macro | `euribor3m`, `emp_var_rate`, … | Públicos; sem PII |
+
+> O grupo protegido de cada cliente é gravado no log de decisão (`protected_groups`)
+> **apenas para auditoria de fairness por grupo**; é computado *após* a decisão e
+> não realimenta a política. A análise por grupo está no `docs/model-card.md` §6.
 
 ## 4. Retenção
 | Dado | Retenção | Observação |

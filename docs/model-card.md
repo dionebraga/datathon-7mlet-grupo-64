@@ -28,7 +28,8 @@
 | Lift de valor (seed 123) | +8,2% | — |
 | Golden set pass-rate | **83,3%** (adversarial 5/5) | — |
 | Estabilidade (CV reward, 5 seeds) | **2,97%** | 20,2% |
-| Fairness (disparidade de exposição) | **0,00** | — |
+| Fairness — disparidade de exposição (grupos protegidos) | **0,00** | — |
+| Fairness — disparidade de valor (margem média, grupos protegidos) | **0,24** (pior: ≤30 anos) | — |
 
 > Numa seed isolada o Thompson capturou um pouco mais de valor (+9,2%); **na média
 > de 5 seeds o LinUCB lidera e é o mais estável** — por isso é a política recomendada.
@@ -46,11 +47,25 @@
 - **Não** está pronto para produção financeira regulada.
 
 ## 6. Análise de fairness
-- Disparidade de exposição (taxa de receber oferta) entre segmentos sintéticos:
-  **0,00** (sem negação de oferta). Mix por segmento varia por **personalização
-  intencional**, monitorado continuamente.
-- Atributos potencialmente sensíveis (idade/profissão/estado civil) **não** são
-  usados como atributos protegidos de decisão.
+A análise cobre os **atributos protegidos** registrados em
+`adaptive_offers/responsible.py` (idade em faixas, estado civil, escolaridade —
+ver `docs/lgpd-plan.md`), em duas dimensões:
+
+- **Disparidade de exposição** (taxa de *receber alguma oferta*) entre grupos
+  protegidos: **0,00** — nenhum grupo é negado contato/valor.
+- **Disparidade de valor** (margem média da oferta recebida): pior caso **0,24**
+  na faixa **≤30 anos** (margem média R$216 vs R$282 na faixa 46–60). É um
+  **resultado de *suitability*, não discriminação**: clientes jovens são
+  direcionados ao Cartão Cashback (margem R$120) em vez de crédito/depósito de
+  alto valor. Estado civil (0,09) e escolaridade (0,14) ficam abaixo do limiar.
+- **Flag automática**: `review` se a disparidade de exposição passar de 0,25 **ou**
+  a de valor passar de 0,30; hoje **`ok`**. O grupo protegido de cada cliente é
+  registrado no log de decisão **apenas para auditoria** (`protected_groups`),
+  **nunca** como variável de decisão.
+
+> Condição de não-uso documentada: se a disparidade de valor crescer com novas
+> ofertas/segmentos, a política deve ser revisada antes de promover (gate de
+> aprovação em `docs/mlops-lifecycle.md`).
 
 ## 7. Vieses conhecidos
 - Base factual é de telemarketing português (2008–2013); não representa o mercado

@@ -191,6 +191,12 @@ class DecisionOut(BaseModel):
     nba_cta: str = Field(
         default="", description="Rótulo do call-to-action.", examples=["Ver valor pré-aprovado"]
     )
+    protected_groups: dict[str, str] = Field(
+        default_factory=dict,
+        description="Grupo de atributos protegidos (somente auditoria de fairness; "
+                    "não usado para decidir).",
+        examples=[{"age_band": "60+", "marital": "married", "education": "university.degree"}],
+    )
 
 
 class OfferOut(BaseModel):

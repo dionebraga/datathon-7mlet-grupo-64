@@ -28,6 +28,7 @@ from adaptive_offers.logging_utils import get_logger, utc_now_iso
 from adaptive_offers.nba import next_best_action
 from adaptive_offers.policy.reason_codes import enrich
 from adaptive_offers.policy.versioning import PolicyMetadata, load_policy
+from adaptive_offers.responsible import protected_groups
 from adaptive_offers.segmentation import segment_of
 
 logger = get_logger("policy.decision_service")
@@ -62,6 +63,7 @@ class DecisionRecord:
     nba_headline: str = ""
     nba_message: str = ""
     nba_cta: str = ""
+    protected_groups: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -162,6 +164,7 @@ class DecisionService:
             nba_headline=nba.headline,
             nba_message=nba.message,
             nba_cta=nba.cta,
+            protected_groups=protected_groups(features),
         )
         if log:
             self._audit(record)
