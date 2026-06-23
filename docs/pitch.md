@@ -18,6 +18,7 @@ Decisão de oferta em canais digitais com multi-armed bandits.
 ## Slide 3 — Abordagem
 - Multi-armed bandit **contextual**: explora vs explota, aprende online.
 - Recompensa **ponderada por margem** (valor, não só conversão).
+- Sobre o bandit, 4 camadas fintech: **persona → canal → mensagem → próximo passo**.
 - Assistente **LLM/RAG** resume experimentos e explica decisões.
 
 ## Slide 4 — Dados e enriquecimento
@@ -29,34 +30,48 @@ Decisão de oferta em canais digitais com multi-armed bandits.
 - Baseline (controle) · Thompson · **Nilos-UCB** (UCB-V) · **LinUCB** (contextual).
 - Cold-start e recompensas atrasadas tratados explicitamente.
 
-## Slide 6 — Demonstração (ao vivo/gravada)
+## Slide 6 — Da decisão à ação (orquestração fintech)
+- **Segmentação** (`segmentation.py`): 6 personas determinísticas das features reais.
+- **Multi-canal** (`channels.py`): app/e-mail/SMS/voz com *frequency cap* e
+  **horário de silêncio** — guardrail com reason codes.
+- **Next-Best-Action** (`nba.py`): mensagem por **template governado** + próximo
+  passo (`SIMULATE_LOAN`, `OPEN_DEPOSIT`…), nunca texto livre do LLM.
+- **IA responsável** (`responsible.py`): atributos protegidos + fairness por grupo.
+- Tudo no **log auditável** e exposto no *explorador de decisão*.
+
+## Slide 7 — Demonstração (ao vivo/gravada)
 - `adaptive-offers pipeline` → dados→synth→treino→avaliação.
-- `POST /decide`: contexto → oferta + **reason codes** + versão + log auditável.
-- Dashboard BI: comparação, regret, mix, **explorador de decisão**.
+- `POST /decide`: contexto → oferta + **canal + mensagem + próximo passo** +
+  **reason codes** + versão + log auditável.
+- Dashboard BI: comparação, regret, mix, **explorador de decisão** (persona, canal, NBA).
 - *Plano de contingência*: gravação versionada caso a demo ao vivo falhe.
 
-## Slide 7 — Evidências
+## Slide 8 — Evidências
 - Base **real** (UCI, 41.188 contatos). Ganho **modesto e honesto**: melhor
   política **+9,2%** de valor vs baseline; **LinUCB** com **menor regret (8,3%)** e
   **maior conversão (9,1%)**.
 - **Robustez (5 seeds)**: LinUCB lidera na média (vence 3/5, o mais estável, CV
   **2,97%**). **Nem todo bandit vence**: Nilos-UCB ficou **abaixo** do baseline.
 - Golden set **83,3%** (adversariais **5/5**, segmento **6/6**).
-- Fairness: disparidade de exposição **0,00**.
+- **Fairness por grupo protegido**: exposição **0,00**; disparidade de **valor**
+  **0,24** (jovens ≤30 recebem ofertas de menor margem) — *suitability*, não
+  discriminação, documentado no model card.
 
-## Slide 8 — Arquitetura técnica (Azure) + alternativas
+## Slide 9 — Arquitetura técnica (Azure) + alternativas
 - Diagrama (Mermaid): Container Apps, ADLS+Redis+PostgreSQL, Azure OpenAI+AI
   Search, Azure ML/MLflow, App Insights, Key Vault + Managed Identity.
 - **Alternativas descartadas**: AKS (overhead), segredos em env (segurança),
   LLM externo (viola "Azure-only"). Fronteiras claras entre camadas.
 
-## Slide 9 — FinOps (ROI · custo · TCO · escala)
+## Slide 10 — FinOps (ROI · custo · TCO · escala)
 - ROI: ganho de valor dilui custo de compute/LLM (LLM só p/ explicação).
 - TCO dominado por Container Apps + Azure OpenAI; demais secundários.
 - Escala ↑: réplicas + tier Redis no pico; ↓: **escala a zero** + cache de RAG.
 
-## Slide 10 — Governança, riscos e impacto
+## Slide 11 — Governança, riscos e impacto
 - Model/System Card + Plano LGPD; humano no loop; rollback em 1 comando.
+- **IA responsável**: atributos protegidos mapeados, fairness por grupo (exposição
+  **e valor**), grupo protegido no log **só para auditoria** — nunca para decidir.
 - Riscos: reward hacking, manipulação de contexto, abuso do assistente — mitigados.
 - Impacto: mais valor por impressão, decisões **auditáveis e explicáveis**, sem
   alegar prontidão para produção regulada.

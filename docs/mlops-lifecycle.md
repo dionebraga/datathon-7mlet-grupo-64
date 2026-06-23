@@ -44,7 +44,8 @@ Uma política só é promovida se **todos** os critérios passarem:
 | Golden set pass-rate | ≥ 0,95 e **100% dos casos adversariais** |
 | Lift de valor vs versão ativa | ≥ 0 (não regredir) |
 | Regret ratio | ≤ regret da versão ativa |
-| Fairness (disparidade de exposição) | ≤ 0,25 |
+| Fairness — disparidade de **exposição** (grupo protegido) | ≤ 0,25 |
+| Fairness — disparidade de **valor** (margem média, grupo protegido) | ≤ 0,30 |
 | Sensibilidade (CV de reward sobre seeds) | ≤ 5% |
 | Revisão humana | aprovação registrada (nome + data) |
 
