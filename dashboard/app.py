@@ -228,7 +228,7 @@ def _hero_bg_layer() -> str:
     try:
         import numpy as np
         from PIL import Image, ImageDraw, ImageFont
-        from scipy.ndimage import binary_closing, binary_dilation
+        from scipy.ndimage import binary_closing, binary_dilation, binary_erosion
         from scipy.ndimage import label as _ndlabel
         from skimage.morphology import skeletonize
 
@@ -255,15 +255,21 @@ def _hero_bg_layer() -> str:
         # p90 of luminance = 24; threshold > 26 catches tube, excludes background
         raw_mask  = arr > 26
         # Small closing: connect adjacent bright pixels on the same strand
-        tube_mask = binary_closing(raw_mask, structure=np.ones((9, 9)))
-        # Dilation: expand to full tube cross-section width so text stays inside
-        tube_mask = binary_dilation(tube_mask, structure=np.ones((7, 7)))
+        core_mask = binary_closing(raw_mask, structure=np.ones((9, 9)))
 
         # Keep only the largest connected component (= the caracol itself)
-        labeled, num = _ndlabel(tube_mask)
+        labeled, num = _ndlabel(core_mask)
         if num > 0:
             sizes = [(labeled == i).sum() for i in range(1, num + 1)]
-            tube_mask = (labeled == (sizes.index(max(sizes)) + 1))
+            core_mask = (labeled == (sizes.index(max(sizes)) + 1))
+
+        # Two masks with distinct jobs:
+        #  • place_mask (dilated)  — generous, used to PLACE text along the tube;
+        #  • clip_mask  (eroded)   — tight, used to CLIP the final render so no
+        #    formula pixel ever shows outside the actual glowing tube.
+        place_mask = binary_dilation(core_mask, structure=np.ones((5, 5)))
+        clip_mask  = binary_erosion(core_mask, structure=np.ones((3, 3)))
+        tube_mask  = place_mask  # placement/skeleton use the generous mask
 
         # Skeletonize to get centerline for path-following text
         sk = set(zip(*[a.tolist() for a in np.where(skeletonize(tube_mask))][::-1]))
@@ -331,6 +337,10 @@ def _hero_bg_layer() -> str:
         mask_up  = (Image.fromarray((tube_mask.astype(np.uint8)) * 255)
                     .resize((IW, IH), Image.NEAREST))
         mask_arr = np.asarray(mask_up) > 0
+        # Tight clip mask (eroded core) upscaled — the definitive boundary.
+        clip_up  = (Image.fromarray((clip_mask.astype(np.uint8)) * 255)
+                    .resize((IW, IH), Image.NEAREST))
+        clip_arr = np.asarray(clip_up) > 0
 
         line_h  = int(fs_sml * 1.75)
         seq_rep = FULL * 80       # long enough to fill all rows
@@ -406,11 +416,12 @@ def _hero_bg_layer() -> str:
 
                 s += pw + fs_big * 0.8   # gap between consecutive phrases
 
-        # ── Clamp: zero alpha for any formula pixel outside the tube ──
-        # This is the definitive fix: even if a phrase extends beyond the
-        # tube boundary when rotated, only the part inside the tube is shown.
+        # ── Clamp: zero alpha for any formula pixel outside the *tight* tube ──
+        # Uses the eroded clip mask (not the dilated placement mask) so even a
+        # phrase that extends past the boundary when rotated is shown only where
+        # the tube actually glows — nothing spills into the dark background.
         lyr_np = np.asarray(layer).copy()
-        lyr_np[:, :, 3] = np.where(mask_arr, lyr_np[:, :, 3], 0)
+        lyr_np[:, :, 3] = np.where(clip_arr, lyr_np[:, :, 3], 0)
         layer = Image.fromarray(lyr_np, "RGBA")
 
         # ── Composite + cache ─────────────────────────────────────────
