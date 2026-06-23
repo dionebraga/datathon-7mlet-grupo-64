@@ -77,6 +77,40 @@ def _arm_label(arm_id: str) -> str:
     return _ARM_LABELS.get(arm_id, str(arm_id).replace("OFF_", "").replace("_", " ").title())
 
 
+def _orchestration_grounding(decision: dict[str, Any]) -> str:
+    """Facts about the persona / channel / next-step layers, for the LLM to cite.
+
+    Returns an empty string when none of the orchestration fields are present, so
+    older decision records stay compatible.
+    """
+    seg = decision.get("segment_label")
+    chan = decision.get("channel_label")
+    nba_action = decision.get("nba_action")
+    nba_cta = decision.get("nba_cta")
+    codes = decision.get("reason_codes", [])
+    if not any((seg, chan, nba_action)):
+        return ""
+    why = []
+    if "QUIET_HOURS" in codes:
+        why.append("horário de silêncio derrubou canais intrusivos")
+    if "FREQUENCY_CAPPED" in codes:
+        why.append("limite de contato atingido")
+    if "CHANNEL_SELECTED" in codes and not why:
+        why.append("menor custo / preferência do cliente")
+    why_txt = f" ({'; '.join(why)})" if why else ""
+    lines = []
+    if seg:
+        lines.append(f"Persona comportamental: {seg}")
+    if chan:
+        lines.append(f"Canal de entrega escolhido: {chan}{why_txt}")
+    if nba_action or nba_cta:
+        step = " / ".join(x for x in (nba_action, nba_cta) if x)
+        lines.append(f"Próximo passo (NBA): {step}")
+    return "Orquestração (persona · canal · próximo passo):\n" + "\n".join(
+        f"  {ln}" for ln in lines
+    ) + "\n"
+
+
 class Assistant:
     """Combines policy RAG + an LLM client into grounded explanations."""
 
@@ -137,6 +171,7 @@ class Assistant:
             estimates = decision.get("estimates") or {}
             p_chosen = estimates.get(decision.get("arm_id"))
             p_line = f"\nP(conversão | contexto) do braço escolhido: {p_chosen:.1%}" if p_chosen else ""
+            orch = _orchestration_grounding(decision)
             grounding = (
                 f"Oferta recomendada: **{arm_name}**\n"
                 f"Política: `{decision.get('policy_name')}@{decision.get('policy_version')}` "
@@ -145,6 +180,7 @@ class Assistant:
                 f"{p_line}\n"
                 f"Ranking dos braços elegíveis por score ponderado por margem:\n{ranking}\n"
                 f"Reason codes: {reason_h}\n"
+                f"{orch}"
                 f"Contexto comercial (RAG):\n{rag_ctx}"
             )
             sys_prompt = (
@@ -167,7 +203,10 @@ class Assistant:
                 "para o escolhido. Jamais invente valores; use apenas o ranking dado.\n"
                 "4) `### Risco & governança` — 1-2 frases: guardrails de "
                 "elegibilidade/suitability e o que monitorar (drift, fairness de exposição).\n"
-                "5) `### Leitura comercial` — 1 frase conectando a decisão à política comercial "
+                "5) `### Orquestração & próximo passo` — 1-2 frases: a persona comportamental, "
+                "o canal de entrega escolhido (e por quê: custo, horário de silêncio ou "
+                "preferência) e o próximo passo (NBA) recomendado. Use só os fatos dados.\n"
+                "6) `### Leitura comercial` — 1 frase conectando a decisão à política comercial "
                 "(RAG).\n\n"
                 "Use SOMENTE os fatos abaixo:\n\n" + grounding
             )
@@ -388,6 +427,30 @@ class Assistant:
             f"### Modo: {mode_label}",
             mode_detail,
             "",
+        ]
+
+        # Orchestration: persona, channel and next step (NBA), if present.
+        seg = decision.get("segment_label")
+        chan = decision.get("channel_label")
+        nba_cta = decision.get("nba_cta")
+        nba_action = decision.get("nba_action")
+        if any((seg, chan, nba_action)):
+            orch_lines: list[str] = []
+            if seg:
+                orch_lines.append(f"• **Persona**: {seg} — segmentação comportamental sobre o contexto real.")
+            if chan and chan != "—":
+                why = ""
+                if "QUIET_HOURS" in codes:
+                    why = " (horário de silêncio derrubou canais intrusivos como voz/SMS)"
+                elif "CHANNEL_SELECTED" in codes:
+                    why = " (política de contato: menor custo / preferência do cliente)"
+                orch_lines.append(f"• **Canal de entrega**: {chan}{why}.")
+            if nba_action or nba_cta:
+                step = " — ".join(x for x in (nba_action, nba_cta) if x)
+                orch_lines.append(f"• **Próximo passo (NBA)**: {step}, com mensagem por template governado (sem texto livre do LLM).")
+            parts += ["### Orquestração & próximo passo", *orch_lines, ""]
+
+        parts += [
             "### Governança aplicada",
             *guardrails,
             "",

@@ -2504,6 +2504,75 @@ if st.button("🚀 Decidir oferta", type="primary", **fill()):
         unsafe_allow_html=True,
     )
 
+    # ── NEXT-BEST-ACTION + ORQUESTRAÇÃO ──────────────────────────────────────
+    # Surfaces the four fintech layers built on top of the bandit: behavioural
+    # persona, delivery channel, the served message + next step, and the
+    # protected-group audit line (never used to decide).
+    _CH_EMOJI = {"app_push": "📱", "email": "✉️", "sms": "💬", "call": "📞", "": "🚫"}
+    _SEG_EMOJI = {"seg_renegociador": "🔄", "seg_senior_conserv": "🛡️",
+                  "seg_jovem_digital": "⚡", "seg_recorrente": "🔁",
+                  "seg_novo_cold": "🌱", "seg_massa": "📊"}
+    ch_emoji  = _CH_EMOJI.get(rec.channel_id, "📨")
+    seg_emoji = _SEG_EMOJI.get(rec.segment_id, "📊")
+    ch_show   = rec.channel_label if rec.channel_id else "Contato suprimido"
+    pg        = rec.protected_groups or {}
+    pg_txt    = " · ".join(f"{k}: <b style='color:{TEXT}'>{v}</b>"
+                           for k, v in pg.items() if k in ("age_band", "marital", "education"))
+
+    def _mini(icon, label, value, sub, color):
+        return (
+            f'<div style="flex:1;min-width:0">'
+            f'  <div style="color:{MUTED};font-size:.70rem;font-weight:700;'
+            f'  letter-spacing:.07em;margin-bottom:5px">{label}</div>'
+            f'  <div style="color:{color};font-size:1.02rem;font-weight:800;line-height:1.2;'
+            f'  white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{icon} {value}</div>'
+            f'  <div style="color:{MUTED};font-size:.72rem;margin-top:3px">{sub}</div>'
+            f'</div>'
+        )
+
+    nba_block = ""
+    if rec.nba_headline:
+        nba_block = (
+            f'<div style="margin-top:14px;padding-top:14px;border-top:1px solid {GRID}">'
+            f'  <div style="color:{MUTED};font-size:.70rem;font-weight:700;letter-spacing:.07em;'
+            f'  margin-bottom:7px">📨 MENSAGEM SERVIDA · <span style="color:{CYAN}">'
+            f'template governado</span></div>'
+            f'  <div style="background:{hex_rgba(CYAN,.06)};border-left:3px solid {hex_rgba(CYAN,.5)};'
+            f'  border-radius:8px;padding:11px 13px">'
+            f'    <div style="color:{TEXT};font-weight:800;font-size:.95rem;margin-bottom:3px">'
+            f'    {rec.nba_headline}</div>'
+            f'    <div style="color:{MUTED};font-size:.84rem;line-height:1.45">{rec.nba_message}</div>'
+            f'    <div style="margin-top:9px"><span style="background:{GREEN};color:#fff;'
+            f'    font-size:.78rem;font-weight:800;padding:5px 13px;border-radius:7px">'
+            f'    {rec.nba_cta} →</span></div>'
+            f'  </div>'
+            f'</div>'
+        )
+
+    pg_block = ""
+    if pg_txt:
+        pg_block = (
+            f'<div style="margin-top:12px;color:{MUTED};font-size:.74rem">'
+            f'🔒 <b style="color:{MUTED}">Grupo protegido</b> ({pg_txt}) — '
+            f'<i>registrado só para auditoria de fairness; <b style="color:{MUTED}">não</b> '
+            f'usado para decidir.</i></div>'
+        )
+
+    st.markdown(
+        f'<div class="result" style="margin-top:14px">'
+        f'<div style="color:{TEXT};font-weight:800;font-size:.95rem;margin-bottom:13px;'
+        f'letter-spacing:.04em">🎯 Próxima ação &amp; orquestração de canal</div>'
+        f'<div style="display:flex;gap:18px;align-items:flex-start">'
+        f'{_mini(seg_emoji, "PERSONA (SEGMENTO)", rec.segment_label or "—", "comportamento detectado", VIOLET)}'
+        f'{_mini(ch_emoji, "CANAL DE ENTREGA", ch_show, "política de contato", CYAN)}'
+        f'{_mini("👉", "PRÓXIMO PASSO (NBA)", rec.nba_cta or "—", rec.nba_action or "—", GOLD)}'
+        f'</div>'
+        f'{nba_block}'
+        f'{pg_block}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
     # ── CHARTS ───────────────────────────────────────────────────────────────
     def _div(label: str) -> None:
         st.markdown(
