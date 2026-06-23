@@ -64,6 +64,29 @@ Quatro políticas sob um contrato único (`select`/`update`), ranqueando por
 pendente; a política só aprende com recompensas maturadas. Detalhes em
 `reports/algorithmic-strategy.md`.
 
+### 4.1 Camada de orquestração fintech (oferta → mensagem → canal → próximo passo)
+
+O bandit decide *qual oferta*; quatro camadas determinísticas sobre ele fecham o
+problema completo do desafio ("qual oferta, mensagem ou próximo passo, em
+diferentes canais"):
+
+- **Segmentação comportamental** (`segmentation.py`) — 6 personas determinísticas
+  e prioritizadas (renegociador, sênior conservador, jovem digital, recorrente,
+  novo/cold-start, massa) derivadas das features reais; leitura humana do book.
+- **Orquestração multi-canal** (`channels.py`) — catálogo de canais (app push,
+  e-mail, SMS, ligação) com custo/latência + `ContactPolicy` (frequency cap,
+  horário de silêncio, escolha por custo/riqueza). Aplicada como guardrail após
+  a seleção, emitindo reason codes (`CHANNEL_SELECTED`, `QUIET_HOURS`,
+  `FREQUENCY_CAPPED`, `CONTACT_SUPPRESSED`).
+- **Next-Best-Action** (`nba.py`) — mensagem por **template governado** (tom por
+  persona, hint por canal) + próximo passo legível por máquina (`SIMULATE_LOAN`,
+  `OPEN_DEPOSIT`, …). Copy nunca é texto livre do LLM, mantendo suitability
+  auditável.
+- **IA responsável** (`responsible.py`) — registro único de atributos protegidos
+  (idade, profissão, estado civil, escolaridade) + fairness por grupo em duas
+  dimensões (exposição **e valor**); o grupo protegido é gravado no log só para
+  auditoria, nunca como variável de decisão (ver §6 do model card).
+
 ## 5. Comparação quantitativa
 
 Base real (UCI Bank Marketing — **41.188 contatos**, `provenance="real"`), 6.000

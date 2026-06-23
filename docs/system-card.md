@@ -43,6 +43,9 @@ sequenceDiagram
 | Exploração responsável | Piso mínimo; exploração só entre elegíveis |
 | Auditabilidade | Reason codes + log por decisão + versão da política |
 | Validação de entrada | Schema Pydantic (limites de idade/euribor/canal) |
+| Política de contato | Frequency cap + horário de silêncio (`channels.py`); suprime contato e emite `FREQUENCY_CAPPED`/`QUIET_HOURS`/`CONTACT_SUPPRESSED` |
+| Mensagem governada | NBA por template (`nba.py`); copy nunca é texto livre do LLM |
+| Atributos protegidos | Registro único (`responsible.py`); grupo gravado só p/ auditoria, nunca para decidir |
 | Reversibilidade | `rollback()` da política ativa |
 
 ## 5. Cenários de risco e mitigação
@@ -57,7 +60,8 @@ sequenceDiagram
 ## 6. Plano de monitoramento
 - **Drift** (PSI/KS) de features e *score* — alerta em PSI ≥ 0,25.
 - **Reward/conversão** — *control chart* (z < −3 → rollback/review).
-- **Fairness** — disparidade de exposição por segmento, contínua.
+- **Fairness** — disparidade de **exposição** e de **valor** (margem média) por
+  grupo protegido; flag `review` se exposição > 0,25 ou valor > 0,30.
 - **Operacional** — latência, erro 4xx/5xx, saúde do feature store (`/health`).
 - **Telemetria** em Application Insights; alertas acionam o *approval gate* de
   retreino (ver `docs/mlops-lifecycle.md`).

@@ -79,6 +79,7 @@ políticas comerciais internas (sintéticas) e explica cada decisão.
 | ⏳ Recompensa atrasada | Modelada no enriquecimento sintético | Realismo de canais digitais |
 | 🗄️ Feature Store | Offline (Parquet) + Online (SQLite) versionado | Consistência treino/serving, baixa latência |
 | 🌐 Serving | FastAPI + CLI, log de decisão auditável | Contrato claro, reason codes, versão de política |
+| 🧭 Orquestração fintech | Segmentação · multi-canal · Next-Best-Action · IA responsável | Decide *oferta + mensagem + canal + próximo passo* e audita fairness por grupo |
 | 🤖 Assistente | RAG sobre políticas sintéticas + LLM plugável (offline por padrão) | Roda sem chave de API; pronto p/ Azure OpenAI/Claude |
 | 📈 Tracking | MLflow | Rastreio de experimentos e métricas |
 | ☁️ Nuvem-alvo | **Azure** (Key Vault, Managed Identity, App Insights…) | Requisito da Fase 05 |
@@ -101,9 +102,13 @@ datathon-7mlet-grupo-74/
 ├── 🧩 src/adaptive_offers/        # pacote Python (lib + API + CLI)
 │   ├── data/ · feature_store/ · bandits/ · simulation/ · evaluation/
 │   ├── policy/ · assistant/ · monitoring/ · api/ · cli.py
+│   ├── segmentation.py            # personas comportamentais (6 segmentos)
+│   ├── channels.py                # catálogo de canais + política de contato
+│   ├── nba.py                     # Next-Best-Action (oferta→mensagem→passo)
+│   └── responsible.py             # atributos protegidos + fairness por grupo
 ├── 📊 dashboard/                  # BI (Streamlit)
 ├── 🎨 frontend/                   # Console de decisão (Next.js + Tailwind v4 — bônus, consome a API)
-└── ✅ tests/                      # unit/ + integration/ (57 testes)
+└── ✅ tests/                      # unit/ + integration/ (71 testes)
 ```
 
 ## 4. 🚀 Como rodar no Windows / PowerShell
