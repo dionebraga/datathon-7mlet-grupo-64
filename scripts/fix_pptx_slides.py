@@ -272,13 +272,13 @@ def api_slide(prs: Presentation) -> None:
     # footer
     txt(slide, Inches(0.45), H - Inches(0.36), W - Inches(0.9), Inches(0.28),
         "Swagger UI em http://localhost:8000/docs  |  "
-        "Decisoes auditaveis em audit_log.jsonl  |  FIAP 7MLET Grupo 64",
+        "Decisoes auditaveis em audit_log.jsonl  |  FIAP 7MLET Grupo 74",
         size=8, color=MUTED, align=PP_ALIGN.CENTER)
 
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 def main() -> None:
-    src = Path(r"c:\Users\Dione\Desktop\datathon-7mlet-grupo-64\datathon-7mlet-grupo-64\docs\Adaptive-Offers-Pitch-Grupo64.pptx")
+    src = Path(__file__).resolve().parents[1] / "docs" / "Adaptive-Offers-Pitch-Grupo74.pptx"
     if not src.exists():
         sys.exit(f"ERROR: {src}")
 

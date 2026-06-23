@@ -6,11 +6,11 @@
 
 *Decide, em canais digitais de uma instituição financeira, **qual oferta / mensagem / próximo passo** apresentar a cada cliente elegível — equilibrando exploração e explotação em vez de regras fixas ou testes A/B longos.*
 
-**FIAP Pós-Tech `7MLET` · Fase 05 · Datathon · Grupo 64**
+**FIAP Pós-Tech `7MLET` · Fase 05 · Datathon · Grupo 74**
 
 <br/>
 
-[![CI](https://github.com/dionebraga/datathon-7mlet-grupo-64/actions/workflows/ci.yml/badge.svg)](https://github.com/dionebraga/datathon-7mlet-grupo-64/actions/workflows/ci.yml)
+[![CI](https://github.com/dionebraga/datathon-7mlet-grupo-74/actions/workflows/ci.yml/badge.svg)](https://github.com/dionebraga/datathon-7mlet-grupo-74/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-57%20passed-brightgreen?style=flat&logo=pytest&logoColor=white)](tests/)
 [![Ruff](https://img.shields.io/badge/lint-ruff%20clean-success?style=flat&logo=ruff&logoColor=white)](https://docs.astral.sh/ruff/)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat)](LICENSE)
@@ -86,7 +86,7 @@ políticas comerciais internas (sintéticas) e explica cada decisão.
 ## 3. 🗂️ Mapa de pastas
 
 ```
-datathon-7mlet-grupo-64/
+datathon-7mlet-grupo-74/
 ├── 📄 README.md · pyproject.toml · .env.example · .gitignore · LICENSE · Makefile
 ├── 🐳 Dockerfile · docker-compose.yml
 ├── ⚙️  .github/workflows/        # CI (lint+test) e CD (build/publish imagem)
@@ -113,8 +113,8 @@ datathon-7mlet-grupo-64/
 
 ```powershell
 # 1) Clonar
-git clone https://github.com/dionebraga/datathon-7mlet-grupo-64.git
-cd datathon-7mlet-grupo-64
+git clone https://github.com/dionebraga/datathon-7mlet-grupo-74.git
+cd datathon-7mlet-grupo-74
 
 # 2) Ambiente virtual
 python -m venv .venv
@@ -283,7 +283,7 @@ ANTHROPIC_MODEL=claude-opus-4-8           # qualidade máxima (ou claude-haiku-4
 
 <div align="center">
 
-**Adaptive Offers Platform** · © 2026 **Dione Braga** — Grupo 64 · FIAP Pós-Tech 7MLET · Licença [MIT](LICENSE)
+**Adaptive Offers Platform** · © 2026 **Dione Braga** — Grupo 74 · FIAP Pós-Tech 7MLET · Licença [MIT](LICENSE)
 
 [⬆ Voltar ao topo](#-adaptive-offers-platform)
 

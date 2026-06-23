@@ -68,7 +68,7 @@ export default function Page() {
 
       <footer className="pt-2 text-center text-xs text-muted">
         <b className="text-text">Adaptive Offers Platform</b> · © 2026{" "}
-        <b className="text-primary-soft">Dione Braga</b> — Grupo 64 · FIAP Pós-Tech 7MLET · Licença MIT
+        <b className="text-primary-soft">Dione Braga</b> — Grupo 74 · FIAP Pós-Tech 7MLET · Licença MIT
       </footer>
     </main>
   );

@@ -178,5 +178,5 @@ _TEMPLATE = """<!doctype html><html lang="pt-br"><head><meta charset="utf-8">
 <h2>⚖️ Fairness de exposição</h2>{fairness}
 <h2>🔌 EvidentlyAI</h2>{evidently}
 <hr style="border-color:#222838;margin-top:28px">
-<p class="sub">Grupo 64 · FIAP 7MLET · monitoramento da Etapa 7</p>
+<p class="sub">Grupo 74 · FIAP 7MLET · monitoramento da Etapa 7</p>
 </body></html>"""

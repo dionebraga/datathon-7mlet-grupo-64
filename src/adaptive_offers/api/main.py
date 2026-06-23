@@ -65,7 +65,7 @@ Serviço de decisão contextual baseado em **Multi-Armed Bandits** para maximiza
 de receita em campanhas de ofertas financeiras. Cada request recebe o contexto do
 cliente e retorna a oferta ótima segundo a política ativa, com rastreabilidade completa.
 
-> 🎓 **FIAP 7MLET — Grupo 64** · Dione Braga
+> 🎓 **FIAP 7MLET — Grupo 74** · Dione Braga
 
 ---
 
@@ -111,7 +111,7 @@ Antes de selecionar o braço, o serviço aplica filtros de elegibilidade:
 Toda decisão é registrada em `artifacts/decisions/audit.jsonl` com:
 `decision_id`, `ts`, `arm_id`, `score`, `explored`, `reason_codes`, `estimates`
 
-**FIAP 7MLET — Grupo 64** · Dione Braga · Licença MIT
+**FIAP 7MLET — Grupo 74** · Dione Braga · Licença MIT
 """
 
 # Logo vetorial da marca (mesma arte do dashboard): 3 barras = braços do bandit,
@@ -179,8 +179,8 @@ def create_app() -> FastAPI:
             },
         ],
         contact={
-            "name": "Dione Braga — Grupo 64",
-            "url": "https://github.com/dionebraga/datathon-7mlet-grupo-64",
+            "name": "Dione Braga — Grupo 74",
+            "url": "https://github.com/dionebraga/datathon-7mlet-grupo-74",
         },
         license_info={
             "name": "MIT",
@@ -261,7 +261,7 @@ footer{text-align:center;color:#8899BB;font-size:11px;padding-top:24px;border-to
   <div class="badge">OAS 3.1 · FastAPI · v0.8.0</div>
   <h1>Adaptive Offers API</h1>
   <p class="sub">Multi-Armed Bandit contextual para decisão de ofertas financeiras em tempo real<br>
-  Thompson Sampling · Nilos-UCB · LinUCB · Baseline Greedy · FIAP 7MLET Grupo 64</p>
+  Thompson Sampling · Nilos-UCB · LinUCB · Baseline Greedy · FIAP 7MLET Grupo 74</p>
   <div class="stack-badges">
     <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
     <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
@@ -359,7 +359,7 @@ footer{text-align:center;color:#8899BB;font-size:11px;padding-top:24px;border-to
   <a class="btn bs" href="/redoc">📘 ReDoc</a>
   <a class="btn bs" href="/openapi.json">⚙️ OpenAPI JSON</a>
 </div>
-<footer>Adaptive Offers Platform v0.8.0 · © 2026 Dione Braga · FIAP Pós-Tech 7MLET · Grupo 64 · MIT</footer>
+<footer>Adaptive Offers Platform v0.8.0 · © 2026 Dione Braga · FIAP Pós-Tech 7MLET · Grupo 74 · MIT</footer>
 </div></body></html>""")
 
     @app.get("/logo.svg", include_in_schema=False)

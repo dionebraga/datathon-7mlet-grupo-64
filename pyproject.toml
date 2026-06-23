@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "adaptive-offers"
 version = "0.8.0"
-description = "Adaptive experimentation platform for financial offers using multi-armed bandits, with feature store, LLM/RAG assistant, MLOps lifecycle and Azure-target architecture. FIAP 7MLET Datathon — Grupo 64."
+description = "Adaptive experimentation platform for financial offers using multi-armed bandits, with feature store, LLM/RAG assistant, MLOps lifecycle and Azure-target architecture. FIAP 7MLET Datathon — Grupo 74."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
-authors = [{ name = "Grupo 64 — FIAP 7MLET" }]
+authors = [{ name = "Grupo 74 — FIAP 7MLET" }]
 keywords = ["multi-armed-bandit", "thompson-sampling", "ucb", "mlops", "feature-store", "rag", "fintech"]
 
 dependencies = [
@@ -56,7 +56,7 @@ dev = [
 adaptive-offers = "adaptive_offers.cli:cli"
 
 [project.urls]
-Repository = "https://github.com/dionebraga/datathon-7mlet-grupo-64"
+Repository = "https://github.com/dionebraga/datathon-7mlet-grupo-74"
 
 [tool.setuptools.packages.find]
 where = ["src"]

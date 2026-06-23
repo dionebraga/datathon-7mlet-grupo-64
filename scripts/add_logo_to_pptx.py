@@ -75,7 +75,7 @@ def add_logo(slide, left: int, top: int, size: int) -> None:
 
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
-    src = root / "docs" / "Adaptive-Offers-Pitch-Grupo64.pptx"
+    src = root / "docs" / "Adaptive-Offers-Pitch-Grupo74.pptx"
     if not src.exists():
         print(f"ERRO: PPTX não encontrado em {src}", file=sys.stderr)
         sys.exit(1)
@@ -97,7 +97,7 @@ def main() -> None:
     print(f"✓ Logo inserido em {src}")
 
     # espelha no artefato de build, se existir
-    build = root / ".pptx-build" / "Adaptive-Offers-Pitch-Grupo64.pptx"
+    build = root / ".pptx-build" / "Adaptive-Offers-Pitch-Grupo74.pptx"
     if build.exists():
         shutil.copy2(src, build)
         print(f"✓ Copiado para {build}")

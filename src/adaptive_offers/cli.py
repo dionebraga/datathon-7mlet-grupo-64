@@ -51,7 +51,7 @@ def _print_comparison(rows: list[dict]) -> None:
 @click.group()
 @click.version_option(package_name="adaptive-offers")
 def cli() -> None:
-    """Adaptive Offers Platform — FIAP 7MLET Grupo 64."""
+    """Adaptive Offers Platform — FIAP 7MLET Grupo 74."""
 
 
 # --------------------------------------------------------------------------- #

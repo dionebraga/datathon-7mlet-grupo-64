@@ -7,7 +7,7 @@
 - **Nome**: Adaptive Offers Policy (multi-armed bandit contextual)
 - **Versão**: v1 (`artifacts/policies/v1/metadata.json` registra hash e métricas)
 - **Tipo**: LinUCB (contextual) — alternativas: Thompson Sampling, Nilos-UCB, baseline
-- **Owner**: Grupo 64 — FIAP 7MLET
+- **Owner**: Grupo 74 — FIAP 7MLET
 - **Frameworks**: numpy/scipy/scikit-learn; tracking em MLflow
 
 ## 2. Dados de treino e avaliação
@@ -85,6 +85,6 @@ ver `docs/lgpd-plan.md`), em duas dimensões:
 
 ## 10. Plano de revisão periódica
 - **Cadência**: trimestral **ou** ao disparar alerta de drift/reward.
-- **Responsável**: owner do modelo (Grupo 64) + revisor de risco.
+- **Responsável**: owner do modelo (Grupo 74) + revisor de risco.
 - **Escopo da revisão**: métricas, golden set, fairness, vieses, incidentes;
   atualizar este card e o `system-card.md`; registrar aprovação.

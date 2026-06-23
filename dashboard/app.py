@@ -1073,7 +1073,7 @@ with st.sidebar:
         f'-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;'
         f'color:transparent">Adaptive Offers</div>'
         f'<div style="font-size:.72rem;color:{CYAN};font-weight:700;letter-spacing:.16em;'
-        f'text-transform:uppercase;margin-top:3px">FIAP 7MLET · Grupo 64</div>'
+        f'text-transform:uppercase;margin-top:3px">FIAP 7MLET · Grupo 74</div>'
         f'</div></div>',
         unsafe_allow_html=True,
     )
@@ -1246,7 +1246,7 @@ st.markdown(
     f'<div class="hero-row">'
     f'<span class="hero-logo">{logo_svg(56, gid="hero")}</span>'
     f'<div>'
-    f'<div class="eyebrow">FIAP Pós-Tech · 7MLET · Grupo 64</div>'
+    f'<div class="eyebrow">FIAP Pós-Tech · 7MLET · Grupo 74</div>'
     f'<h1><span class="hero-grad">Adaptive Offers</span>'
     f'<span class="hero-board">Observability Board</span></h1>'
     f'</div></div>'
@@ -2817,8 +2817,8 @@ st.divider()
 st.markdown(
     f'<div style="text-align:center;color:{MUTED};font-size:.90rem;padding:12px 0 6px">'
     f'<b style="color:{TEXT}">Adaptive Offers Platform</b> · © 2026 '
-    f'<b style="color:{CYAN}">Dione Braga</b> — Grupo 64 · FIAP Pós-Tech 7MLET'
+    f'<b style="color:{CYAN}">Dione Braga</b> — Grupo 74 · FIAP Pós-Tech 7MLET'
     '<br/><span style="font-size:.82rem">Licença MIT · '
-    '<a href="https://github.com/dionebraga/datathon-7mlet-grupo-64" '
-    f'style="color:{MUTED};text-decoration:none">github.com/dionebraga/datathon-7mlet-grupo-64</a>'
+    '<a href="https://github.com/dionebraga/datathon-7mlet-grupo-74" '
+    f'style="color:{MUTED};text-decoration:none">github.com/dionebraga/datathon-7mlet-grupo-74</a>'
     '</span></div>', unsafe_allow_html=True)

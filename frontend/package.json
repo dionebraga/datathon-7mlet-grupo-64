@@ -2,7 +2,7 @@
   "name": "adaptive-offers-frontend",
   "version": "0.8.0",
   "private": true,
-  "description": "Next.js Decision Console for the Adaptive Offers Platform (consumes the FastAPI backend). FIAP 7MLET — Grupo 64.",
+  "description": "Next.js Decision Console for the Adaptive Offers Platform (consumes the FastAPI backend). FIAP 7MLET — Grupo 74.",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

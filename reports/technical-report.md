@@ -1,6 +1,6 @@
 # Relatório Técnico — Adaptive Offers Platform
 
-**FIAP Pós-Tech 7MLET · Fase 05 · Datathon · Grupo 64**
+**FIAP Pós-Tech 7MLET · Fase 05 · Datathon · Grupo 74**
 Plataforma de experimentação adaptativa para ofertas financeiras com multi-armed
 bandits, feature store, assistente LLM/RAG, avaliação offline, ciclo MLOps e
 arquitetura-alvo Azure.

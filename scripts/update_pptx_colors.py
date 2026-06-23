@@ -427,7 +427,7 @@ def add_api_slide(prs: Presentation):
     # footer
     note = slide.shapes.add_textbox(Inches(0.45), H - Inches(0.45), W - Inches(0.9), Inches(0.3))
     np = note.text_frame.paragraphs[0]
-    np.text = "Swagger UI automático em http://localhost:8000/docs  ·  Decisões auditáveis em audit_log.jsonl  ·  FIAP 7MLET Grupo 64"
+    np.text = "Swagger UI automático em http://localhost:8000/docs  ·  Decisões auditáveis em audit_log.jsonl  ·  FIAP 7MLET Grupo 74"
     np.font.size = Pt(8.5)
     np.font.color.rgb = MUTED
     np.font.name = "Inter"
@@ -456,7 +456,7 @@ def recolor_presentation(prs: Presentation):
 
 
 def main():
-    src = Path(r"c:\Users\Dione\Desktop\datathon-7mlet-grupo-64\datathon-7mlet-grupo-64\docs\Adaptive-Offers-Pitch-Grupo64.pptx")
+    src = Path(__file__).resolve().parents[1] / "docs" / "Adaptive-Offers-Pitch-Grupo74.pptx"
     dst = src  # overwrite in place
 
     if not src.exists():

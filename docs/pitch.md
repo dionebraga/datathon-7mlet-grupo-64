@@ -7,7 +7,7 @@
 ---
 
 ## Slide 1 — Capa
-**Adaptive Offers Platform** · FIAP 7MLET · Grupo 64
+**Adaptive Offers Platform** · FIAP 7MLET · Grupo 74
 Decisão de oferta em canais digitais com multi-armed bandits.
 
 ## Slide 2 — Problema (negócio)
