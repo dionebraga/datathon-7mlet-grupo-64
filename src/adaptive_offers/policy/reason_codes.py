@@ -29,6 +29,11 @@ REASON_CODES: dict[str, str] = {
     # value
     "MARGIN_WEIGHTED": "Ranqueamento ponderado pela margem da oferta.",
     "VALUE_FLOOR_OK": "Valor esperado acima do piso mínimo configurado.",
+    # channel orchestration / contact policy
+    "CHANNEL_SELECTED": "Canal de entrega escolhido pela política de contato.",
+    "QUIET_HOURS": "Horário de silêncio — canais intrusivos (voz/SMS) suprimidos.",
+    "FREQUENCY_CAPPED": "Limite de contatos na janela atingido — não recontatar.",
+    "CONTACT_SUPPRESSED": "Contato suprimido pela política (sem canal elegível).",
 }
 
 

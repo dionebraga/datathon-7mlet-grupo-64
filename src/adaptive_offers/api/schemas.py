@@ -170,6 +170,13 @@ class DecisionOut(BaseModel):
     segment_label: str = Field(
         default="", description="Rótulo legível da persona.", examples=["Sênior conservador"]
     )
+    channel_id: str = Field(
+        default="", description="Canal de entrega escolhido pela política de contato.",
+        examples=["app_push"],
+    )
+    channel_label: str = Field(
+        default="", description="Rótulo legível do canal.", examples=["App Push"]
+    )
 
 
 class OfferOut(BaseModel):

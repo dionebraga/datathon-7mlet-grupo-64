@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from adaptive_offers.bandits.base import Policy
+from adaptive_offers.channels import DEFAULT_CONTACT_POLICY
 from adaptive_offers.config import get_settings
 from adaptive_offers.data.synthetic import (
     OfferArm,
@@ -54,6 +55,8 @@ class DecisionRecord:
     scores: dict[str, float] = field(default_factory=dict)
     segment_id: str = ""
     segment_label: str = ""
+    channel_id: str = ""
+    channel_label: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -110,6 +113,20 @@ class DecisionService:
         arm = self.by_id[decision.arm_id]
         exp_rew = expected_reward(arm, ctx_vec)
         seg = segment_of(features)
+
+        # Channel orchestration: the bandit picked *what* to offer; the contact
+        # policy decides *where/whether* to deliver it. The control arm (no offer)
+        # has nothing to deliver, so contact is suppressed by construction.
+        if arm.offer_id == CONTROL_ARM:
+            channel, ch_codes = None, ["CONTACT_SUPPRESSED"]
+        else:
+            # High-value / complex products (margin >= R$150: e.g. Seguro Bundle,
+            # Fundo, Crédito) warrant a rich-creative channel.
+            channel, ch_codes = DEFAULT_CONTACT_POLICY.select(
+                features, offer_rich=float(arm.margin) >= 150.0
+            )
+        codes.extend(ch_codes)
+
         self._counter += 1
         record = DecisionRecord(
             decision_id=f"dec_{self._counter:08d}",
@@ -129,6 +146,8 @@ class DecisionService:
             scores={k: round(float(v), 4) for k, v in (decision.scores or {}).items()},
             segment_id=seg.seg_id,
             segment_label=seg.label,
+            channel_id=channel.channel_id if channel else "",
+            channel_label=channel.label if channel else "—",
         )
         if log:
             self._audit(record)
