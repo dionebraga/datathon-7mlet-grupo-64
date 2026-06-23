@@ -177,6 +177,20 @@ class DecisionOut(BaseModel):
     channel_label: str = Field(
         default="", description="Rótulo legível do canal.", examples=["App Push"]
     )
+    nba_action: str = Field(
+        default="", description="Próximo passo (Next-Best-Action) recomendado.",
+        examples=["SIMULATE_LOAN"],
+    )
+    nba_headline: str = Field(
+        default="", description="Título da mensagem (template governado).",
+        examples=["Você tem crédito pré-aprovado"],
+    )
+    nba_message: str = Field(
+        default="", description="Corpo da mensagem, adaptado à persona e ao canal.",
+    )
+    nba_cta: str = Field(
+        default="", description="Rótulo do call-to-action.", examples=["Ver valor pré-aprovado"]
+    )
 
 
 class OfferOut(BaseModel):

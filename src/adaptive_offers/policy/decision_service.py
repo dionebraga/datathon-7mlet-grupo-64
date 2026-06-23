@@ -25,6 +25,7 @@ from adaptive_offers.data.synthetic import (
 )
 from adaptive_offers.feature_store.store import FeatureStore
 from adaptive_offers.logging_utils import get_logger, utc_now_iso
+from adaptive_offers.nba import next_best_action
 from adaptive_offers.policy.reason_codes import enrich
 from adaptive_offers.policy.versioning import PolicyMetadata, load_policy
 from adaptive_offers.segmentation import segment_of
@@ -57,6 +58,10 @@ class DecisionRecord:
     segment_label: str = ""
     channel_id: str = ""
     channel_label: str = ""
+    nba_action: str = ""
+    nba_headline: str = ""
+    nba_message: str = ""
+    nba_cta: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -127,6 +132,11 @@ class DecisionService:
             )
         codes.extend(ch_codes)
 
+        # Next-Best-Action: offer -> governed message + concrete next step.
+        nba = next_best_action(arm.offer_id, seg.seg_id, channel.channel_id if channel else "")
+        if arm.offer_id != CONTROL_ARM:
+            codes.append("NBA_GENERATED")
+
         self._counter += 1
         record = DecisionRecord(
             decision_id=f"dec_{self._counter:08d}",
@@ -148,6 +158,10 @@ class DecisionService:
             segment_label=seg.label,
             channel_id=channel.channel_id if channel else "",
             channel_label=channel.label if channel else "—",
+            nba_action=nba.action_code,
+            nba_headline=nba.headline,
+            nba_message=nba.message,
+            nba_cta=nba.cta,
         )
         if log:
             self._audit(record)

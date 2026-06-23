@@ -34,6 +34,8 @@ REASON_CODES: dict[str, str] = {
     "QUIET_HOURS": "Horário de silêncio — canais intrusivos (voz/SMS) suprimidos.",
     "FREQUENCY_CAPPED": "Limite de contatos na janela atingido — não recontatar.",
     "CONTACT_SUPPRESSED": "Contato suprimido pela política (sem canal elegível).",
+    # next-best-action
+    "NBA_GENERATED": "Mensagem e próximo passo (NBA) gerados por template governado.",
 }
 
 
